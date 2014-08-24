@@ -23,7 +23,6 @@
   [{:keys [onyx.core/task-map] :as event}]
   {:onyx.core/batch (take (:onyx/batch-size task-map) (:kafka/messages event))})
 
-
 (defmethod p-ext/apply-fn [:input :kafka]
   [_]
   {})
