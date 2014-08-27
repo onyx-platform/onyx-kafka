@@ -54,10 +54,13 @@ In your peer boot-up namespace:
 
 |key                           | type      | description
 |------------------------------|-----------|------------
-|`:datomic/uri`                | `string`  | The URI of the datomic database to connect to
-|`:datomic/t`                  | `integer` | The t-value of the database to read from
-|`:datomic/partition`          | `keyword` | The partition of the database to read out of
-|`:datomic/datoms-per-segment` | `integer` | The number of datoms to compress into a single segment
+|`:kafka/topic`                | `string`  | The topic name to connect to
+|`:kafka/zookeeper`            | `string`  | The ZooKeeper connection string
+|`:kafka/group-id`             | `string`  | The consumer identity to store in ZooKeeper
+|`:kafka/offset-reset`         | `string`  | Offset to seek to when not found - "smallest" or "largest"
+|`:kafka/brokers`              | `string`  | A Kafka brokers connection string
+|`:kafka/serializer-class`     | `string`  | The Kafka serialization class to use
+|`:kafka/partitioner-class`    | `string`  | The Kafka partitioning class to use
 
 #### Contributing
 
