@@ -27,7 +27,7 @@ In your peer boot-up namespace:
  :onyx/medium :kafka
  :onyx/consumption :sequential
  :kafka/topic topic-name
- :kafka/zookeeper "127.0.0.1:2181
+ :kafka/zookeeper "127.0.0.1:2181"
  :kafka/group-id "onyx-consumer"
  :kafka/offset-reset "smallest"
  :onyx/batch-size batch-size
