@@ -1,10 +1,25 @@
 (ns onyx.plugin.input-test
   (:require [clojure.core.async :refer [chan <!!]]
+            [clojure.data.fressian :as fressian]
             [midje.sweet :refer :all]
+            [clj-kafka.producer :as kp]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
-            [onyx.api]
             [onyx.plugin.core-async]
-            [onyx.plugin.kafka]))
+            [onyx.plugin.kafka]
+            [onyx.api]))
+
+(def topic (str "onyx-test-" (java.util.UUID/randomUUID)))
+
+(def producer
+  (kp/producer
+   {"metadata.broker.list" "127.0.0.1:9092"
+    "serializer.class" "kafka.serializer.DefaultEncoder"
+    "partitioner.class" "kafka.producer.DefaultPartitioner"}))
+
+(kp/send-message producer (kp/message topic (.array (fressian/write {:n 1}))))
+(kp/send-message producer (kp/message topic (.array (fressian/write {:n 2}))))
+(kp/send-message producer (kp/message topic (.array (fressian/write {:n 3}))))
+(kp/send-message producer (kp/message topic (.array (fressian/write :done))))
 
 (def workflow {:read-messages {:identity :out}})
 
@@ -14,10 +29,9 @@
     :onyx/type :input
     :onyx/medium :kafka
     :onyx/consumption :sequential
-    :kafka/topic "onyx-topic"
-    :kafka/threads 2
+    :kafka/topic topic
     :kafka/zookeeper "127.0.0.1:2181"
-    :kafka/group-id "my-id"
+    :kafka/group-id "onyx-consumer"
     :kafka/offset-reset "smallest"
     :onyx/batch-size 1
     :onyx/doc "Reads messages from a Kafka topic"}
@@ -64,9 +78,9 @@
 
 (onyx.api/submit-job conn {:catalog catalog :workflow workflow})
 
-(def results (doall (map (fn [_] (<!! out-chan)) (range 3))))
+(def results (doall (map (fn [_] (<!! out-chan)) (range 4))))
 
-(clojure.pprint/pprint results)
+(fact results => [{:n 1} {:n 2} {:n 3} :done])
 
 (doseq [v-peer v-peers]
   ((:shutdown-fn v-peer)))
