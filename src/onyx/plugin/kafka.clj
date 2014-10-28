@@ -31,15 +31,18 @@
   [{:keys [kafka/ch onyx.core/task-map] :as event}]
   {:onyx.core/batch (->> (range (:onyx/batch-size task-map))
                          (map (fn [_] (<!! ch)))
-                         (filter identity))})
+                         (filter identity)
+                         (map (fn [x] {:input :kafka :message x})))})
 
 (defmethod p-ext/decompress-batch [:input :kafka]
   [{:keys [onyx.core/batch] :as event}]
-  {:onyx.core/decompressed (map fressian/read batch)})
+  {:onyx.core/decompressed (map (comp fressian/read :message) batch)})
 
-(defmethod p-ext/ack-batch [:input :kafka]
-  [{:keys [onyx.core/batch]}]
-  {:onyx.core/acked (count batch)})
+(defmethod p-ext/strip-sentinel [:input :kafka]
+  [{:keys [onyx.core/decompressed]}]
+  {:onyx.core/tail-batch? (= (last decompressed) :done)
+   :onyx.core/requeue? false
+   :onyx.core/decompressed (remove (partial = :done) decompressed)})
 
 (defmethod p-ext/apply-fn [:input :kafka]
   [{:keys [onyx.core/decompressed]}]
