@@ -1,5 +1,5 @@
 (ns onyx.plugin.kafka
-  (:require [clojure.core.async :refer [chan >!! <!! close!]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! timeout alts!!]]
             [clojure.data.fressian :as fressian]
             [clj-kafka.consumer.zk :as zk]
             [clj-kafka.producer :as kp]
@@ -29,10 +29,13 @@
 
 (defmethod p-ext/read-batch [:input :kafka]
   [{:keys [kafka/ch onyx.core/task-map] :as event}]
-  {:onyx.core/batch (->> (range (:onyx/batch-size task-map))
-                         (map (fn [_] (<!! ch)))
-                         (filter identity)
-                         (map (fn [x] {:input :kafka :message x})))})
+  (let [ms (or (:onyx/batch-timeout task-map) 1000)]
+    {:onyx.core/batch
+     (->> (range (:onyx/batch-size task-map))
+          (map (fn [_]
+                 {:input :kafka
+                  :message (first (alts!! [ch (timeout ms)]))}))
+          (filter (comp not nil? :message)))}))
 
 (defmethod p-ext/decompress-batch [:input :kafka]
   [{:keys [onyx.core/batch] :as event}]
