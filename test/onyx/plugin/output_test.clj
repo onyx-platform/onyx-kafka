@@ -24,7 +24,7 @@
 
    {:onyx/name :identity
     :onyx/fn :clojure.core/identity
-    :onyx/type :transformer
+    :onyx/type :function
     :onyx/consumption :concurrent
     :onyx/batch-size 1}
 
