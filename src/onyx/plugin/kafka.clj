@@ -6,7 +6,7 @@
             [clj-kafka.core :as k]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [taoensso.timbre :refer [fatal]]))
+            [taoensso.timbre :refer [fatal] :as log]))
 
 (defmethod l-ext/inject-lifecycle-resources :kafka/read-messages
   [_ {:keys [onyx.core/task-map] :as pipeline}]
@@ -17,6 +17,7 @@
         ch (chan (:kafka/chan-capacity task-map))]
     {:kafka/future (future
                      (try
+                       (log/debug "Opening Kafka resource " config)
                        (k/with-resource [c (zk/consumer config)]
                          zk/shutdown
                          (loop [ms (zk/messages c (:kafka/topic task-map))]
@@ -24,7 +25,8 @@
                            (recur (rest ms))))
                        (catch InterruptedException e)
                        (catch Exception e
-                         (fatal e))))
+                         (fatal e)))
+                     (log/debug "Stopping Kafka consumer and cleaning up"))
      :kafka/ch ch}))
 
 (defmethod p-ext/read-batch [:input :kafka]
@@ -51,11 +53,10 @@
   [{:keys [onyx.core/decompressed]}]
   {:onyx.core/results decompressed})
 
-(defmethod l-ext/close-temporal-resources :kafka/read-messages
+(defmethod l-ext/close-lifecycle-resources :kafka/read-messages
   [_ {:keys [kafka/ch] :as pipeline}]
-  (when (:onyx.core/tail-batch? pipeline)
-    (close! ch)
-    (future-cancel (:kafka/future pipeline)))
+  (future-cancel (:kafka/future pipeline))
+  (close! ch)
   {})
 
 (defmethod l-ext/inject-lifecycle-resources :kafka/write-messages
