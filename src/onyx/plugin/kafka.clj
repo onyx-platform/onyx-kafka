@@ -94,12 +94,12 @@
 (defmethod p-ext/write-batch [:output :kafka]
   [{:keys [onyx.core/results kafka/producer kafka/topic]}]
   (let [messages (mapcat :leaves results)]
-    (doseq [m (map :message)]
-      (kp/send-message producer (kp/message topic m))))
+    (doseq [m (map :message messages)]
+      (kp/send-message producer (kp/message topic (.getBytes (pr-str m))))))
   {})
 
 (defmethod p-ext/seal-resource [:output :kafka]
   [{:keys [kafka/producer kafka/topic]}]
-  (kp/send-message producer (kp/message topic :done))
+  (kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
   {})
 
