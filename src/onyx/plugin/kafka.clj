@@ -1,12 +1,11 @@
 (ns onyx.plugin.kafka
   (:require [clojure.core.async :refer [chan >!! <!! close! timeout alts!!]]
-            [clojure.data.fressian :as fressian]
             [clj-kafka.consumer.zk :as zk]
             [clj-kafka.producer :as kp]
             [clj-kafka.core :as k]
             [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [taoensso.timbre :refer [fatal] :as log]))
+            [taoensso.timbre :as log :refer [fatal]]))
 
 (defmethod l-ext/inject-lifecycle-resources :kafka/read-messages
   [_ {:keys [onyx.core/task-map] :as pipeline}]
@@ -21,37 +20,61 @@
                        (k/with-resource [c (zk/consumer config)]
                          zk/shutdown
                          (loop [ms (zk/messages c (:kafka/topic task-map))]
-                           (>!! ch (:value (first ms)))
+                           (if (= (:value (first ms)) :done)
+                             (>!! ch :done)
+                             (>!! ch {:content (:value (first ms))}))
                            (recur (rest ms))))
                        (catch InterruptedException e)
                        (catch Exception e
                          (fatal e)))
                      (log/debug "Stopping Kafka consumer and cleaning up"))
-     :kafka/ch ch}))
+     :kafka/read-ch ch
+     :kafka/pending-messages (atom {})}))
 
 (defmethod p-ext/read-batch [:input :kafka]
-  [{:keys [kafka/ch onyx.core/task-map] :as event}]
-  (let [ms (or (:onyx/batch-timeout task-map) 1000)]
-    {:onyx.core/batch
-     (->> (range (:onyx/batch-size task-map))
-          (map (fn [_]
-                 {:input :kafka
-                  :message (first (alts!! [ch (timeout ms)]))}))
-          (filter (comp not nil? :message)))}))
+  [{:keys [kafka/read-ch kafka/pending-messages onyx.core/task-map] :as event}]
+  (let [pending (count (keys @pending-messages))
+        max-pending (or (:onyx/max-pending task-map) 10000)
+        batch-size (:onyx/batch-size task-map)
+        max-segments (min (- max-pending pending) batch-size)
+        ms (or (:onyx/batch-timeout task-map) 50)
+        timeout-ch (timeout ms)
+        batch (->> (range max-segments)
+                   (map (fn [_]
+                          (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
+                            (if (= :done result)
+                              {:id (java.util.UUID/randomUUID)
+                               :input :kafka
+                               :message :done}
+                              {:id (java.util.UUID/randomUUID)
+                               :input :kafka
+                               :message (:content result)}))))
+                   (remove (comp nil? :message)))]
+    (doseq [m batch]
+      (swap! pending-messages assoc (:id m) (select-keys m [:message])))
+    {:onyx.core/batch batch}))
 
-(defmethod p-ext/decompress-batch [:input :kafka]
-  [{:keys [onyx.core/batch] :as event}]
-  {:onyx.core/decompressed (map (comp fressian/read :message) batch)})
+(defmethod p-ext/ack-message [:input :kafka]
+  [{:keys [kafka/pending-messages onyx.core/log onyx.core/task-id]} message-id]
+  (swap! pending-messages dissoc message-id))
 
-(defmethod p-ext/strip-sentinel [:input :kafka]
-  [{:keys [onyx.core/decompressed]}]
-  {:onyx.core/tail-batch? (= (last decompressed) :done)
-   :onyx.core/requeue? false
-   :onyx.core/decompressed (remove (partial = :done) decompressed)})
+(defmethod p-ext/retry-message [:input :kafka]
+  [{:keys [kafka/pending-messages kafka/read-ch onyx.core/log]} message-id]
+  (let [msg (get @pending-messages message-id)]
+    (if (= :done (:message msg))
+      (>!! read-ch :done)
+      (>!! read-ch (get @pending-messages message-id))))
+  (swap! pending-messages dissoc message-id))
 
-(defmethod p-ext/apply-fn [:input :kafka]
-  [{:keys [onyx.core/decompressed]}]
-  {:onyx.core/results decompressed})
+(defmethod p-ext/pending? [:input :kafka]
+  [{:keys [kafka/pending-messages]} message-id]
+  (get @pending-messages message-id))
+
+(defmethod p-ext/drained? [:input :kafka]
+  [{:keys [kafka/pending-messages]}]
+  (let [x @pending-messages]
+    (and (= (count (keys x)) 1)
+         (= (first (map :message (vals x))) :done))))
 
 (defmethod l-ext/close-lifecycle-resources :kafka/read-messages
   [_ {:keys [kafka/ch] :as pipeline}]
@@ -68,22 +91,15 @@
      :kafka/topic (:kafka/topic task-map)
      :kafka/producer (kp/producer config)}))
 
-(defmethod p-ext/apply-fn [:output :kafka]
-  [{:keys [onyx.core/decompressed]}]
-  {:onyx.core/results decompressed})
-
-(defmethod p-ext/compress-batch [:output :kafka]
-  [{:keys [onyx.core/results]}]
-  {:onyx.core/compressed (map #(.array (fressian/write %)) results)})
-
 (defmethod p-ext/write-batch [:output :kafka]
-  [{:keys [onyx.core/compressed kafka/producer kafka/topic]}]
-  (doseq [c compressed]
-    (kp/send-message producer (kp/message topic c)))
+  [{:keys [onyx.core/results kafka/producer kafka/topic]}]
+  (let [messages (mapcat :leaves results)]
+    (doseq [m (map :message)]
+      (kp/send-message producer (kp/message topic m))))
   {})
 
 (defmethod p-ext/seal-resource [:output :kafka]
   [{:keys [kafka/producer kafka/topic]}]
-  (kp/send-message producer (kp/message topic (.array (fressian/write :done))))
+  (kp/send-message producer (kp/message topic :done))
   {})
 
