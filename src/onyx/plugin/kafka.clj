@@ -77,9 +77,9 @@
          (= (first (map :message (vals x))) :done))))
 
 (defmethod l-ext/close-lifecycle-resources :kafka/read-messages
-  [_ {:keys [kafka/ch] :as pipeline}]
+  [_ {:keys [kafka/read-ch] :as pipeline}]
   (future-cancel (:kafka/future pipeline))
-  (close! ch)
+  (close! read-ch)
   {})
 
 (defmethod l-ext/inject-lifecycle-resources :kafka/write-messages

@@ -29,6 +29,7 @@ In your peer boot-up namespace:
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/group-id "onyx-consumer"
  :kafka/offset-reset "smallest"
+ :onyx/max-peers 1
  :onyx/batch-size batch-size
  :onyx/doc "Reads messages from a Kafka topic"}
 ```
@@ -45,7 +46,7 @@ In your peer boot-up namespace:
  :kafka/serializer-class "kafka.serializer.DefaultEncoder"
  :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
  :onyx/batch-size batch-size
- :onyx/doc "Reads messages from a Kafka topic"}
+ :onyx/doc "Writes messages to a Kafka topic"}
 ```
 
 #### Attributes
