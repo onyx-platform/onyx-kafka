@@ -1,0 +1,17 @@
+test:
+  override:
+    - lein with-profile dev,circle-ci midje:
+        timeout: 60
+
+machine:
+  java:
+    version: oraclejdk8
+
+dependencies:
+  pre:
+    - cd ..
+    - wget https://www.apache.org/dyn/closer.cgi?path=/kafka/0.8.2.1/kafka_2.9.2-0.8.2.1.tgz
+    - tar -xvf kafka_2.9.2-0.8.2.1.tgz
+    - cd kafka_2.9.2-0.8.2.1
+    - bin/zookeeper-server-start.sh config/zookeeper.properties &
+
