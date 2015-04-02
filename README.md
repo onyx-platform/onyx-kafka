@@ -7,7 +7,7 @@ Onyx plugin providing read and write facilities for Kafka.
 In your project file:
 
 ```clojure
-[com.mdrogalis/onyx-kafka "0.5.3.1"]
+[com.mdrogalis/onyx-kafka "0.6.0-SNAPSHOT"]
 ```
 
 In your peer boot-up namespace:
@@ -25,7 +25,6 @@ In your peer boot-up namespace:
  :onyx/ident :kafka/read-messages
  :onyx/type :input
  :onyx/medium :kafka
- :onyx/consumption :sequential
  :kafka/topic topic-name
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/group-id "onyx-consumer"
@@ -41,7 +40,6 @@ In your peer boot-up namespace:
  :onyx/ident :kafka/write-messages
  :onyx/type :output
  :onyx/medium :kafka
- :onyx/consumption :concurrent
  :kafka/topic topic-name
  :kafka/brokers "127.0.0.1:9092"
  :kafka/serializer-class "kafka.serializer.DefaultEncoder"
@@ -68,6 +66,6 @@ Pull requests into the master branch are welcomed.
 
 #### License
 
-Copyright © 2014 Michael Drogalis
+Copyright © 2015 Michael Drogalis
 
 Distributed under the Eclipse Public License, the same as Clojure.
