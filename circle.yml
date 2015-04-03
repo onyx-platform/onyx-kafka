@@ -14,5 +14,5 @@ dependencies:
     - tar -xvf kafka_2.9.2-0.8.2.1.tgz
     - cd kafka_2.9.2-0.8.2.1
     - bin/zookeeper-server-start.sh config/zookeeper.properties:
-      background: true
+        background: true
 
