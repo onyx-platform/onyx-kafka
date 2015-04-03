@@ -13,6 +13,6 @@ dependencies:
     - wget http://mirror.olnevhost.net/pub/apache/kafka/0.8.2.1/kafka_2.9.2-0.8.2.1.tgz
     - tar -xvf kafka_2.9.2-0.8.2.1.tgz
     - cd kafka_2.9.2-0.8.2.1
-    - bin/zookeeper-server-start.sh config/zookeeper.properties
+    - bin/zookeeper-server-start.sh config/zookeeper.properties:
       background: true
 
