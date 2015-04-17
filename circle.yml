@@ -9,18 +9,13 @@ machine:
 
 dependencies:
   pre:
-    - "cd .."
+    - cd .. && git clone https://github.com/real-logic/Aeron.git && cd Aeron && git checkout cb3588760f88aac614ec5bbae9e05d1c7a675968 && ./gradlew && gradle install
+    - "cd ~"
     - "wget http://mirror.olnevhost.net/pub/apache/kafka/0.8.2.1/kafka_2.9.2-0.8.2.1.tgz"
     - "tar -xvf kafka_2.9.2-0.8.2.1.tgz"
     - "cd kafka_2.9.2-0.8.2.1"
     - "/home/ubuntu/onyx-kafka/kafka_2.9.2-0.8.2.1/bin/kafka-server-start.sh /home/ubuntu/onyx-kafka/kafka_2.9.2-0.8.2.1/config/server.properties":
         background: true
-    - "cd .."
-    - "git clone https://github.com/real-logic/Aeron.git"
-    - "cd Aeron"
-    - "git checkout cb3588760f88aac614ec5bbae9e05d1c7a675968"
-    - "./gradlew"
-    - "gradle install"
   cache_directories:
     - "~/Aeron"
     - "kafka_2.9.2-0.8.2.1"
