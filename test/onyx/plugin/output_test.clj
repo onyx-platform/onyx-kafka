@@ -75,7 +75,7 @@
 
 (onyx.api/submit-job peer-config
                      {:catalog catalog :workflow workflow
-                      :task-scheduler :onyx.task-scheduler/round-robin})
+                      :task-scheduler :onyx.task-scheduler/balanced})
 
 (def config
   {"zookeeper.connect" "127.0.0.1:2181"

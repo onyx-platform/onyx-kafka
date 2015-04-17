@@ -80,7 +80,7 @@
 
 (onyx.api/submit-job peer-config
                      {:catalog catalog :workflow workflow
-                      :task-scheduler :onyx.task-scheduler/round-robin})
+                      :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (doall (map (fn [_] (read-string (String. (<!! out-chan) "UTF-8"))) (range 4))))
 
