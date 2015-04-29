@@ -103,8 +103,8 @@
   {})
 
 (def read-messages-calls
-  {:lifecycle/before-task :onyx.plugin.kafka/inject-read-messages
-   :lifecycle/after-task :onyx.plugin.kafka/close-read-messages})
+  {:lifecycle/before-task inject-read-messages
+   :lifecycle/after-task close-read-messages})
 
 (def write-messages-calls
-  {:lifecycle/before-task :onyx.plugin.kafka/inject-write-messages})
+  {:lifecycle/before-task inject-write-messages})

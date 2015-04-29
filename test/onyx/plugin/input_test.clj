@@ -75,7 +75,7 @@
   {:core.async/chan out-chan})
 
 (def out-calls
-  {:lifecycle/before-task :onyx.plugin.input-test/inject-out-ch})
+  {:lifecycle/before-task inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :read-messages

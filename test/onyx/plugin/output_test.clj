@@ -70,7 +70,7 @@
   {:core.async/chan in-chan})
 
 (def in-calls
-  {:lifecycle/before-task :onyx.plugin.output-test/inject-in-ch})
+  {:lifecycle/before-task inject-in-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
