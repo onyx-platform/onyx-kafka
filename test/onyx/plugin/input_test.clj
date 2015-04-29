@@ -1,6 +1,5 @@
 (ns onyx.plugin.input-test
   (:require [clojure.core.async :refer [chan >!! <!!]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.plugin.kafka]
             [clj-kafka.producer :as kp]
@@ -72,14 +71,27 @@
 
 (def out-chan (chan 100))
 
-(defmethod l-ext/inject-lifecycle-resources :out
-  [_ _] {:core.async/chan out-chan})
+(defn inject-out-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def out-calls
+  {:lifecycle/before-task :onyx.plugin.input-test/inject-out-ch})
+
+(def lifecycles
+  [{:lifecycle/task :read-messages
+    :lifecycle/calls :onyx.plugin.kafka/read-messages-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.input-test/out-calls}
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
-(onyx.api/submit-job peer-config
-                     {:catalog catalog :workflow workflow
-                      :task-scheduler :onyx.task-scheduler/balanced})
+(onyx.api/submit-job
+ peer-config
+ {:catalog catalog :workflow workflow
+  :lifecycles lifecycles
+  :task-scheduler :onyx.task-scheduler/balanced})
 
 (def results (doall (map (fn [_] (read-string (String. (<!! out-chan) "UTF-8"))) (range 4))))
 
