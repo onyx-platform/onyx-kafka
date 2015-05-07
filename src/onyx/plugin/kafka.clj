@@ -3,12 +3,11 @@
             [clj-kafka.consumer.zk :as zk]
             [clj-kafka.producer :as kp]
             [clj-kafka.core :as k]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.peer.pipeline-extensions :as p-ext]
             [taoensso.timbre :as log :refer [fatal]]))
 
-(defmethod l-ext/inject-lifecycle-resources :kafka/read-messages
-  [_ {:keys [onyx.core/task-map] :as pipeline}]
+(defn inject-read-messages
+  [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
   (let [config {"zookeeper.connect" (:kafka/zookeeper task-map)
                 "group.id" (:kafka/group-id task-map)
                 "auto.offset.reset" (:kafka/offset-reset task-map)
@@ -76,14 +75,14 @@
     (and (= (count (keys x)) 1)
          (= (first (map :message (vals x))) :done))))
 
-(defmethod l-ext/close-lifecycle-resources :kafka/read-messages
-  [_ {:keys [kafka/read-ch] :as pipeline}]
+(defn close-read-messages
+  [{:keys [kafka/read-ch] :as pipeline} lifecycle]
   (future-cancel (:kafka/future pipeline))
   (close! read-ch)
   {})
 
-(defmethod l-ext/inject-lifecycle-resources :kafka/write-messages
-  [_ {:keys [onyx.core/task-map] :as pipeline}]
+(defn inject-write-messages
+  [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
   (let [config {"metadata.broker.list" (:kafka/brokers task-map)
                 "serializer.class" (:kafka/serializer-class task-map)
                 "partitioner.class" (:kafka/partitioner-class task-map)}]
@@ -102,3 +101,10 @@
   [{:keys [kafka/producer kafka/topic]}]
   (kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
   {})
+
+(def read-messages-calls
+  {:lifecycle/before-task inject-read-messages
+   :lifecycle/after-task close-read-messages})
+
+(def write-messages-calls
+  {:lifecycle/before-task inject-write-messages})

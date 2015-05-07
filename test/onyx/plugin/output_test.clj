@@ -1,6 +1,5 @@
 (ns onyx.plugin.output-test
   (:require [clojure.core.async :refer [chan >!! <!!]]
-            [onyx.peer.task-lifecycle-extensions :as l-ext]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.plugin.kafka]
             [clj-kafka.consumer.zk :as zk]
@@ -62,19 +61,31 @@
 
 (def in-chan (chan 1000))
 
-(defmethod l-ext/inject-lifecycle-resources :in
-  [_ _] {:core.async/chan in-chan})
-
 (>!! in-chan {:n 0})
 (>!! in-chan {:n 1})
 (>!! in-chan {:n 2})
 (>!! in-chan :done)
 
+(defn inject-in-ch [event lifecycle]
+  {:core.async/chan in-chan})
+
+(def in-calls
+  {:lifecycle/before-task inject-in-ch})
+
+(def lifecycles
+  [{:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.output-test/in-calls}
+   {:lifecycle/task :in
+    :lifecycle/calls :onyx.plugin.core-async/reader-calls}
+   {:lifecycle/task :write-messages
+    :lifecycle/calls :onyx.plugin.kafka/write-messages-calls}])
+
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
-(onyx.api/submit-job peer-config
-                     {:catalog catalog :workflow workflow
-                      :task-scheduler :onyx.task-scheduler/balanced})
+(onyx.api/submit-job
+ peer-config
+ {:catalog catalog :workflow workflow :lifecycles lifecycles
+  :task-scheduler :onyx.task-scheduler/balanced})
 
 (def config
   {"zookeeper.connect" "127.0.0.1:2181"
