@@ -1,4 +1,4 @@
-(defproject com.mdrogalis/onyx-kafka "0.6.0-alpha2"
+(defproject com.mdrogalis/onyx-kafka "0.6.0-SNAPSHOT"
   :description "Onyx plugin for Kafka"
   :url "https://github.com/MichaelDrogalis/onyx-kafka"
   :license {:name "Eclipse Public License"
