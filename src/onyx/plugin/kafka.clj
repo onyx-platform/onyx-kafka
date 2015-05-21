@@ -1,5 +1,5 @@
 (ns onyx.plugin.kafka
-  (:require [clojure.core.async :refer [chan >!! <!! close! timeout alts!!]]
+  (:require [clojure.core.async :refer [chan >!! <!! close! timeout alts!! sliding-buffer]]
             [clj-kafka.producer :as kp]
             [clj-kafka.zk :as kzk]
             [clj-kafka.consumer.simple :as kc]
@@ -7,7 +7,8 @@
             [cheshire.core :refer [parse-string]]
             [zookeeper :as zk]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [taoensso.timbre :as log :refer [fatal]]))
+            [taoensso.timbre :as log :refer [fatal]])
+  (:import [kafka.message Message]))
 
 (defn id->broker [m]
   (k/with-resource [z (zk/connect (get m "zookeeper.connect"))]
@@ -30,9 +31,17 @@
         (kc/topic-offset consumer topic partition :latest)
         :else (kzk/committed-offset m group-id topic (str partition))))
 
+
+(defn highest-offset-to-commit [offsets]
+  (->> (partition-all 2 1 offsets)
+       (partition-by #(- (or (second %) (first %)) (first %)))
+       (first)
+       (last)
+       (last)))
+
 (defn start-kafka-consumer
   [{:keys [onyx.core/task-map] :as event} lifecycle]
-  (let [{:keys [kafka/topic kafka/partition kafka/group-id fetch-size]} task-map
+  (let [{:keys [kafka/topic kafka/partition kafka/group-id fetch-size chan-capacity]} task-map
         partition (str partition)
         client-id "onyx"
         m {"zookeeper.connect" (:kafka/zookeeper task-map)}
@@ -41,33 +50,40 @@
         broker (get (id->broker m) (first brokers))
         consumer (kc/consumer (:host broker) (:port broker) client-id)
         offset (starting-offset consumer topic partition group-id task-map)
-        messages (kc/messages consumer "onyx" topic partition offset fetch-size)]
-    {:kafka/consumer consumer
-     :kafka/messages messages}))
-
-(defn inject-read-messages
-  [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
-  (let [config {"zookeeper.connect" (:kafka/zookeeper task-map)
-                "group.id" (:kafka/group-id task-map)
-                "auto.offset.reset" (:kafka/offset-reset task-map)
-                "auto.commit.enable" "true"}
-        ch (chan (:kafka/chan-capacity task-map))]
-    {:kafka/future (future
+        messages (kc/messages consumer "onyx" topic partition offset fetch-size)
+        ch (chan (sliding-buffer chan-capacity))
+        pending-messages (atom {})
+        pending-commits (atom (sorted-set))
+        reader-fut (future
                      (try
-                       (log/debug "Opening Kafka resource " config)
-                       (k/with-resource [c (zk/consumer config)]
-                         zk/shutdown
-                         (loop [ms (zk/messages c (:kafka/topic task-map))]
-                           (if (= (:value (first ms)) :done)
-                             (>!! ch :done)
-                             (>!! ch {:content (:value (first ms))}))
-                           (recur (rest ms))))
+                       (log/debug "Opening Kafka resource " task-map)
+                       (loop [ms messages]
+                         (if (first ms)
+                           (>!! ch {:message (.payload ^Message (first ms))
+                                    :offset (.offset ^int (first ms))})
+                           (Thread/sleep (:kafka/empty-read-back-off task-map)))
+                         (recur (rest ms)))
                        (catch InterruptedException e)
-                       (catch Exception e
-                         (fatal e)))
-                     (log/debug "Stopping Kafka consumer and cleaning up"))
+                       (catch Throwable e
+                         (fatal e))))
+        commit-fut (future
+                     (try
+                       (loop []
+                         (Thread/sleep (:kafka/commit-interval task-map))
+                         (let [offset (highest-offset-to-commit @(pending-commits))]
+                           (kzk/set-offset! m consumer topic partition offset)
+                           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))
+                           (recur)))
+                       (catch InterruptedException e)
+                       (catch Throwable e
+                         (fatal e))))]
+    {:kafka/consumer consumer
+     :kafka/messages messages
      :kafka/read-ch ch
-     :kafka/pending-messages (atom {})}))
+     :kafka/reader-future reader-fut
+     :kafka/commit-future commit-fut
+     :kafka/pending-messages pending-messages
+     :kafka/pending-commits pending-commits}))
 
 (defmethod p-ext/read-batch :kafka/read-messages
   [{:keys [kafka/read-ch kafka/pending-messages onyx.core/task-map] :as event}]
@@ -79,21 +95,20 @@
         timeout-ch (timeout ms)
         batch (->> (range max-segments)
                    (map (fn [_]
-                          (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
-                            (if (= :done result)
-                              {:id (java.util.UUID/randomUUID)
-                               :input :kafka
-                               :message :done}
-                              {:id (java.util.UUID/randomUUID)
-                               :input :kafka
-                               :message (:content result)}))))
+                          (let [result (first (alts!! [read-ch timeout-ch] :priority true))
+                                ]
+                            {:id (java.util.UUID/randomUUID)
+                             :input :kafka
+                             :message (read-string (String. (:message result) "UTF-8"))
+                             :offset (:offset result)})))
                    (remove (comp nil? :message)))]
     (doseq [m batch]
-      (swap! pending-messages assoc (:id m) (select-keys m [:message])))
+      (swap! pending-messages assoc (:id m) (select-keys m [:message :offset])))
     {:onyx.core/batch batch}))
 
 (defmethod p-ext/ack-message :kafka/read-messages
-  [{:keys [kafka/pending-messages onyx.core/log onyx.core/task-id]} message-id]
+  [{:keys [kafka/pending-messages kafka/pending-commits onyx.core/log onyx.core/task-id]} message-id]
+  (swap! pending-commits conj (:offset (get pending-messages message-id)))
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/retry-message :kafka/read-messages
@@ -116,7 +131,8 @@
 
 (defn close-read-messages
   [{:keys [kafka/read-ch] :as pipeline} lifecycle]
-  (future-cancel (:kafka/future pipeline))
+  (future-cancel (:kafka/reader-future pipeline))
+  (future-cancel (:kafka/commit-future pipeline))
   (close! read-ch)
   {})
 
@@ -142,7 +158,7 @@
   {})
 
 (def read-messages-calls
-  {:lifecycle/before-task inject-read-messages
+  {:lifecycle/before-task start-kafka-consumer
    :lifecycle/after-task close-read-messages})
 
 (def write-messages-calls
