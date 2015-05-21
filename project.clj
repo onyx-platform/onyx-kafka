@@ -7,7 +7,9 @@
                  [org.clojure/core.async "0.1.303.0-886421-alpha"]
                  [com.mdrogalis/onyx "0.6.0-alpha2"]
                  [com.taoensso/timbre "3.0.1"]
-                 [clj-kafka "0.2.8-0.8.1.1" :exclusions [org.apache.zookeeper/zookeeper]]]
+                 [clj-kafka "0.2.8-0.8.1.1" :exclusions [org.apache.zookeeper/zookeeper]]
+                 [cheshire "5.4.0"]
+                 [zookeeper-clj "0.9.1" :exclusions [io.netty/netty]]]
   :profiles {:dev {:dependencies [[midje "1.6.2"]]
                    :plugins [[lein-midje "3.1.3"]]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}})

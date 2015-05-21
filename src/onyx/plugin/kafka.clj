@@ -1,10 +1,49 @@
 (ns onyx.plugin.kafka
   (:require [clojure.core.async :refer [chan >!! <!! close! timeout alts!!]]
-            [clj-kafka.consumer.zk :as zk]
             [clj-kafka.producer :as kp]
+            [clj-kafka.zk :as kzk]
+            [clj-kafka.consumer.simple :as kc]
             [clj-kafka.core :as k]
+            [cheshire.core :refer [parse-string]]
+            [zookeeper :as zk]
             [onyx.peer.pipeline-extensions :as p-ext]
             [taoensso.timbre :as log :refer [fatal]]))
+
+(defn id->broker [m]
+  (k/with-resource [z (zk/connect (get m "zookeeper.connect"))]
+    zk/close
+    (if-let [broker-ids (zk/children z "/brokers/ids")]
+      (doall
+       (into
+        {}
+        (map
+         (fn [id]
+           (let [s (String. ^bytes (:data (zk/data z (str "/brokers/ids/" id))))]
+             {(Integer/parseInt id) (parse-string s true)}))
+         broker-ids)))
+      [])))
+
+(defn starting-offset [consumer topic partition group-id task-map]
+  (cond (= (:kafka/offset-reset task-map) :smallest)
+        (kc/topic-offset consumer topic partition :earliest)
+        (= (:kafka/offset-reset task-map) :largest)
+        (kc/topic-offset consumer topic partition :latest)
+        :else (kzk/committed-offset m group-id topic (str partition))))
+
+(defn start-kafka-consumer
+  [{:keys [onyx.core/task-map] :as event} lifecycle]
+  (let [{:keys [kafka/topic kafka/partition kafka/group-id fetch-size]} task-map
+        partition (str partition)
+        client-id "onyx"
+        m {"zookeeper.connect" (:kafka/zookeeper task-map)}
+        partitions (kzk/partitions m topic)
+        brokers (get partitions partition)
+        broker (get (id->broker m) (first brokers))
+        consumer (kc/consumer (:host broker) (:port broker) client-id)
+        offset (starting-offset consumer topic partition group-id task-map)
+        messages (kc/messages consumer "onyx" topic partition offset fetch-size)]
+    {:kafka/consumer consumer
+     :kafka/messages messages}))
 
 (defn inject-read-messages
   [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
