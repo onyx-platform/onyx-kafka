@@ -103,8 +103,8 @@
   {})
 
 (def read-messages-calls
-  {:lifecycle/before-task inject-read-messages
-   :lifecycle/after-task close-read-messages})
+  {:lifecycle/before-task-start inject-read-messages
+   :lifecycle/after-task-stop close-read-messages})
 
 (def write-messages-calls
-  {:lifecycle/before-task inject-write-messages})
+  {:lifecycle/before-task-start inject-write-messages})
