@@ -56,7 +56,8 @@
         pending-commits (atom (sorted-set))
         reader-fut (future
                      (try
-                       (log/debug "Opening Kafka resource " task-map)
+                       (log/debug "Opening Kafka consumer" task-map)
+                       (log/debug (str "Kafka consumer is starting at offset " offset))
                        (loop [ms messages]
                          (if (first ms)
                            (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
@@ -101,14 +102,14 @@
                              :message (:message result)
                              :offset (:offset result)})))
                    (remove (comp nil? :message)))]
-    (prn batch)
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (select-keys m [:message :offset])))
     {:onyx.core/batch batch}))
 
 (defmethod p-ext/ack-message :kafka/read-messages
   [{:keys [kafka/pending-messages kafka/pending-commits onyx.core/log onyx.core/task-id]} message-id]
-  (swap! pending-commits conj (:offset (get pending-messages message-id)))
+  (when-let [offset (:offset (get pending-messages message-id))]
+    (swap! pending-commits conj offset))
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/retry-message :kafka/read-messages

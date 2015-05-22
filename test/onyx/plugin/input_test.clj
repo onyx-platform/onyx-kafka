@@ -57,7 +57,7 @@
     :kafka/zookeeper "127.0.0.1:2181"
     :kafka/offset-reset :smallest
     :kafka/empty-read-back-off 500
-    :kafka/commit-interval 1000
+    :kafka/commit-interval 500
     :onyx/max-peers 1
     :onyx/batch-size 100
     :onyx/doc "Reads messages from a Kafka topic"}
@@ -98,7 +98,7 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def results (doall (map (fn [_] (read-string (String. (<!! out-chan) "UTF-8"))) (range 4))))
+(def results (doall (map (fn [_] (<!! out-chan)) (range 4))))
 
 (fact results => [{:n 1} {:n 2} {:n 3} :done])
 
