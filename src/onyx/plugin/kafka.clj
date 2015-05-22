@@ -30,12 +30,19 @@
          broker-ids)))
       [])))
 
-(defn starting-offset [m consumer topic partition group-id task-map]
+(defn read-from-bound [consumer topic partition task-map]
   (cond (= (:kafka/offset-reset task-map) :smallest)
         (kc/topic-offset consumer topic partition :earliest)
         (= (:kafka/offset-reset task-map) :largest)
         (kc/topic-offset consumer topic partition :latest)
-        :else (kzk/committed-offset m group-id topic partition)))
+        :else (throw (ex-info ":kafka/offset-reset must be either :smallest or :largest" {:task-map task-map}))))
+
+(defn starting-offset [m consumer topic partition group-id task-map]
+  (if (:kafka/force-reset? task-map)
+    (read-from-bound consumer topic partition task-map)
+    (if-let [x (kzk/committed-offset m group-id topic partition)]
+      x
+      (read-from-bound consumer topic partition task-map))))
 
 (defn highest-offset-to-commit [offsets]
   (->> (partition-all 2 1 offsets)

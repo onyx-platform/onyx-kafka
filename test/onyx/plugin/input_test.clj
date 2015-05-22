@@ -56,6 +56,7 @@
     :kafka/chan-capacity 1000
     :kafka/zookeeper "127.0.0.1:2181"
     :kafka/offset-reset :smallest
+    :kafka/force-reset? true
     :kafka/empty-read-back-off 500
     :kafka/commit-interval 500
     :onyx/max-peers 1

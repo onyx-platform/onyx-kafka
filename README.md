@@ -36,6 +36,7 @@ Catalog entry:
  :kafka/chan-capacity 1000
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/offset-reset :smallest
+ :kafka/force-reset? true
  :kafka/empty-read-back-off 500
  :kafka/commit-interval 500
  :onyx/max-peers 1
@@ -85,6 +86,7 @@ Lifecycle entry:
 |`:kafka/group-id`           | `string`  |         | The consumer identity to store in ZooKeeper
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
 |`:kafka/offset-reset`       | `keyword` |         | Offset bound to seek to when not found - `:smallest` or `:largest`
+|`:kafka/force-reset?`       | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the lack acknowledged messsage if it exists
 |`:kafka/chan-capacity`      | `integer` |`1000`   | The buffer size of the Kafka reading channel
 |`:kafka/fetch-size`         | `integer` |`307200` | The size in bytes to request from ZooKeeper per fetch request
 |`:kafka/empty-read-back-off`| `integer` |`500`    | The amount of time to back off between reads when nothing was fetched from a consumer
