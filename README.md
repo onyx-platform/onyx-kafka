@@ -7,7 +7,7 @@ Onyx plugin providing read and write facilities for Kafka. The reader facilities
 In your project file:
 
 ```clojure
-[com.mdrogalis/onyx-kafka "0.6.0-beta1"]
+[com.mdrogalis/onyx-kafka "0.6.0-SNAPSHOT"]
 ```
 
 In your peer boot-up namespace:
