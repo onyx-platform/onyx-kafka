@@ -1,6 +1,6 @@
 ## onyx-kafka
 
-Onyx plugin providing read and write facilities for Kafka.
+Onyx plugin providing read and write facilities for Kafka. The reader facilities automatically discover broker locations from ZooKeeper.
 
 #### Installation
 
@@ -20,7 +20,7 @@ In your peer boot-up namespace:
 
 ##### read-messages
 
-Reads segments from a Kafka topic.
+Reads segments from one Kafka topic's partition.
 
 Catalog entry:
 
@@ -29,12 +29,18 @@ Catalog entry:
  :onyx/ident :kafka/read-messages
  :onyx/type :input
  :onyx/medium :kafka
- :kafka/topic "topic-name"
- :kafka/zookeeper "127.0.0.1:2181"
+ :kafka/topic "my topic"
+ :kafka/partition "0"
  :kafka/group-id "onyx-consumer"
- :kafka/offset-reset "smallest"
+ :kafka/fetch-size 307200
+ :kafka/chan-capacity 1000
+ :kafka/zookeeper "127.0.0.1:2181"
+ :kafka/offset-reset :smallest
+ :kafka/force-reset? true
+ :kafka/empty-read-back-off 500
+ :kafka/commit-interval 500
  :onyx/max-peers 1
- :onyx/batch-size batch-size
+ :onyx/batch-size 100
  :onyx/doc "Reads messages from a Kafka topic"}
 ```
 
@@ -73,15 +79,18 @@ Lifecycle entry:
 
 #### Attributes
 
-|key                           | type      | description
-|------------------------------|-----------|------------
-|`:kafka/topic`                | `string`  | The topic name to connect to
-|`:kafka/zookeeper`            | `string`  | The ZooKeeper connection string
-|`:kafka/group-id`             | `string`  | The consumer identity to store in ZooKeeper
-|`:kafka/offset-reset`         | `string`  | Offset to seek to when not found - "smallest" or "largest"
-|`:kafka/brokers`              | `string`  | A Kafka brokers connection string
-|`:kafka/serializer-class`     | `string`  | The Kafka serialization class to use
-|`:kafka/partitioner-class`    | `string`  | The Kafka partitioning class to use
+|key                         | type      | default | description
+|----------------------------|-----------|---------|------------
+|`:kafka/topic`              | `string`  |         | The topic name to connect to
+|`:kafka/partition`          | `string`  |         | The partition to read from
+|`:kafka/group-id`           | `string`  |         | The consumer identity to store in ZooKeeper
+|`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
+|`:kafka/offset-reset`       | `keyword` |         | Offset bound to seek to when not found - `:smallest` or `:largest`
+|`:kafka/force-reset?`       | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the lack acknowledged messsage if it exists
+|`:kafka/chan-capacity`      | `integer` |`1000`   | The buffer size of the Kafka reading channel
+|`:kafka/fetch-size`         | `integer` |`307200` | The size in bytes to request from ZooKeeper per fetch request
+|`:kafka/empty-read-back-off`| `integer` |`500`    | The amount of time to back off between reads when nothing was fetched from a consumer
+|`:kafka/commit-interval`    | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
 
 #### Contributing
 
