@@ -8,7 +8,7 @@
             [zookeeper :as zk]
             [onyx.peer.pipeline-extensions :as p-ext]
             [taoensso.timbre :as log :refer [fatal]])
-  (:import [kafka.message Message]))
+  (:import [clj_kafka.core KafkaMessage]))
 
 (defn id->broker [m]
   (k/with-resource [z (zk/connect (get m "zookeeper.connect"))]
@@ -59,7 +59,7 @@
                        (log/debug "Opening Kafka resource " task-map)
                        (loop [ms messages]
                          (if (first ms)
-                           (>!! ch {:message (.payload ^Message (first ms))
+                           (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
                                     :offset (.offset ^int (first ms))})
                            (Thread/sleep (:kafka/empty-read-back-off task-map)))
                          (recur (rest ms)))
@@ -70,10 +70,10 @@
                      (try
                        (loop []
                          (Thread/sleep (:kafka/commit-interval task-map))
-                         (let [offset (highest-offset-to-commit @pending-commits)]
+                         (when-let [offset (highest-offset-to-commit @pending-commits)]
                            (kzk/set-offset! m consumer topic partition offset)
-                           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))
-                           (recur)))
+                           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
+                         (recur))
                        (catch InterruptedException e)
                        (catch Throwable e
                          (fatal e))))]
@@ -91,16 +91,17 @@
         max-pending (or (:onyx/max-pending task-map) 10000)
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
-        ms (or (:onyx/batch-timeout task-map) 50)
+        ms (or (:onyx/batch-timeout task-map) 500)
         timeout-ch (timeout ms)
         batch (->> (range max-segments)
                    (map (fn [_]
                           (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
                             {:id (java.util.UUID/randomUUID)
                              :input :kafka
-                             :message (if result (read-string (String. (:message result) "UTF-8")))
+                             :message (:message result)
                              :offset (:offset result)})))
                    (remove (comp nil? :message)))]
+    (prn batch)
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (select-keys m [:message :offset])))
     {:onyx.core/batch batch}))
@@ -112,10 +113,7 @@
 
 (defmethod p-ext/retry-message :kafka/read-messages
   [{:keys [kafka/pending-messages kafka/read-ch onyx.core/log]} message-id]
-  (let [msg (get @pending-messages message-id)]
-    (if (= :done (:message msg))
-      (>!! read-ch :done)
-      (>!! read-ch (get @pending-messages message-id))))
+  (>!! read-ch (get @pending-messages message-id))
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/pending? :kafka/read-messages
