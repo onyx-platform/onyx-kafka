@@ -75,7 +75,7 @@
   {:core.async/chan out-chan})
 
 (def out-calls
-  {:lifecycle/before-task inject-out-ch})
+  {:lifecycle/before-task-start inject-out-ch})
 
 (def lifecycles
   [{:lifecycle/task :read-messages

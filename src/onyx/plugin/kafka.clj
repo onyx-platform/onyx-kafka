@@ -24,13 +24,12 @@
          broker-ids)))
       [])))
 
-(defn starting-offset [consumer topic partition group-id task-map]
+(defn starting-offset [m consumer topic partition group-id task-map]
   (cond (= (:kafka/offset-reset task-map) :smallest)
         (kc/topic-offset consumer topic partition :earliest)
         (= (:kafka/offset-reset task-map) :largest)
         (kc/topic-offset consumer topic partition :latest)
         :else (kzk/committed-offset m group-id topic (str partition))))
-
 
 (defn highest-offset-to-commit [offsets]
   (->> (partition-all 2 1 offsets)
@@ -49,7 +48,7 @@
         brokers (get partitions partition)
         broker (get (id->broker m) (first brokers))
         consumer (kc/consumer (:host broker) (:port broker) client-id)
-        offset (starting-offset consumer topic partition group-id task-map)
+        offset (starting-offset m consumer topic partition group-id task-map)
         messages (kc/messages consumer "onyx" topic partition offset fetch-size)
         ch (chan (sliding-buffer chan-capacity))
         pending-messages (atom {})
@@ -158,8 +157,8 @@
   {})
 
 (def read-messages-calls
-  {:lifecycle/before-task start-kafka-consumer
-   :lifecycle/after-task close-read-messages})
+  {:lifecycle/before-task-start start-kafka-consumer
+   :lifecycle/after-task-stop close-read-messages})
 
 (def write-messages-calls
-  {:lifecycle/before-task inject-write-messages})
+  {:lifecycle/before-task-start inject-write-messages})

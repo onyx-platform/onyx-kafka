@@ -70,7 +70,7 @@
   {:core.async/chan in-chan})
 
 (def in-calls
-  {:lifecycle/before-task inject-in-ch})
+  {:lifecycle/before-task-start inject-in-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
