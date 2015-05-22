@@ -10,6 +10,12 @@
             [taoensso.timbre :as log :refer [fatal]])
   (:import [clj_kafka.core KafkaMessage]))
 
+(def defaults
+  {:kafka/fetch-size 307200
+   :kafka/chan-capacity 1000
+   :kafka/empty-read-back-off 500
+   :kafka/commit-interval 2000})
+
 (defn id->broker [m]
   (k/with-resource [z (zk/connect (get m "zookeeper.connect"))]
     zk/close
@@ -40,8 +46,11 @@
 
 (defn start-kafka-consumer
   [{:keys [onyx.core/task-map] :as event} lifecycle]
-  (let [{:keys [kafka/topic kafka/partition kafka/group-id
-                kafka/fetch-size kafka/chan-capacity]} task-map
+  (let [{:keys [kafka/topic kafka/partition kafka/group-id]} task-map
+        fetch-size (or (:kafka/fetch-size task-map) (:kafka/fetch-size defaults))
+        chan-capacity (or (:kafka/chan-capacity task-map) (:kafka/chan-capacity defaults))
+        empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
+        commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         partition (Integer/parseInt partition)
         client-id "onyx"
         m {"zookeeper.connect" (:kafka/zookeeper task-map)}
@@ -51,7 +60,7 @@
         consumer (kc/consumer (:host broker) (:port broker) client-id)
         offset (starting-offset m consumer topic partition group-id task-map)
         messages (kc/messages consumer "onyx" topic partition offset fetch-size)
-        ch (chan (sliding-buffer chan-capacity))
+        ch (chan chan-capacity)
         pending-messages (atom {})
         pending-commits (atom (sorted-set))
         reader-fut (future
@@ -62,7 +71,7 @@
                          (if (first ms)
                            (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
                                     :offset (.offset ^int (first ms))})
-                           (Thread/sleep (:kafka/empty-read-back-off task-map)))
+                           (Thread/sleep empty-read-back-off))
                          (recur (rest ms)))
                        (catch InterruptedException e)
                        (catch Throwable e
@@ -70,7 +79,7 @@
         commit-fut (future
                      (try
                        (loop []
-                         (Thread/sleep (:kafka/commit-interval task-map))
+                         (Thread/sleep commit-interval)
                          (when-let [offset (highest-offset-to-commit @pending-commits)]
                            (kzk/set-offset! m consumer topic partition offset)
                            (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
