@@ -50,9 +50,14 @@
     :onyx/type :input
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/partition "0"
     :kafka/group-id "onyx-consumer"
-    :kafka/offset-reset "smallest"
+    :kafka/fetch-size 307200
+    :kafka/chan-capacity 1000
+    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/offset-reset :smallest
+    :kafka/empty-read-back-off 500
+    :kafka/commit-interval 1000
     :onyx/max-peers 1
     :onyx/batch-size 100
     :onyx/doc "Reads messages from a Kafka topic"}
@@ -97,10 +102,10 @@
 
 (fact results => [{:n 1} {:n 2} {:n 3} :done])
 
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
+(do
+  (doseq [v-peer v-peers]
+    (onyx.api/shutdown-peer v-peer))
 
-(onyx.api/shutdown-peer-group peer-group)
+  (onyx.api/shutdown-peer-group peer-group)
 
-(onyx.api/shutdown-env env)
-
+  (onyx.api/shutdown-env env))

@@ -29,7 +29,7 @@
         (kc/topic-offset consumer topic partition :earliest)
         (= (:kafka/offset-reset task-map) :largest)
         (kc/topic-offset consumer topic partition :latest)
-        :else (kzk/committed-offset m group-id topic (str partition))))
+        :else (kzk/committed-offset m group-id topic partition)))
 
 (defn highest-offset-to-commit [offsets]
   (->> (partition-all 2 1 offsets)
@@ -40,12 +40,13 @@
 
 (defn start-kafka-consumer
   [{:keys [onyx.core/task-map] :as event} lifecycle]
-  (let [{:keys [kafka/topic kafka/partition kafka/group-id fetch-size chan-capacity]} task-map
-        partition (str partition)
+  (let [{:keys [kafka/topic kafka/partition kafka/group-id
+                kafka/fetch-size kafka/chan-capacity]} task-map
+        partition (Integer/parseInt partition)
         client-id "onyx"
         m {"zookeeper.connect" (:kafka/zookeeper task-map)}
         partitions (kzk/partitions m topic)
-        brokers (get partitions partition)
+        brokers (get partitions (str partition))
         broker (get (id->broker m) (first brokers))
         consumer (kc/consumer (:host broker) (:port broker) client-id)
         offset (starting-offset m consumer topic partition group-id task-map)
@@ -69,7 +70,7 @@
                      (try
                        (loop []
                          (Thread/sleep (:kafka/commit-interval task-map))
-                         (let [offset (highest-offset-to-commit @(pending-commits))]
+                         (let [offset (highest-offset-to-commit @pending-commits)]
                            (kzk/set-offset! m consumer topic partition offset)
                            (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))
                            (recur)))
@@ -94,11 +95,10 @@
         timeout-ch (timeout ms)
         batch (->> (range max-segments)
                    (map (fn [_]
-                          (let [result (first (alts!! [read-ch timeout-ch] :priority true))
-                                ]
+                          (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
                             {:id (java.util.UUID/randomUUID)
                              :input :kafka
-                             :message (read-string (String. (:message result) "UTF-8"))
+                             :message (if result (read-string (String. (:message result) "UTF-8")))
                              :offset (:offset result)})))
                    (remove (comp nil? :message)))]
     (doseq [m batch]
