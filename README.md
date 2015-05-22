@@ -1,6 +1,6 @@
 ## onyx-kafka
 
-Onyx plugin providing read and write facilities for Kafka.
+Onyx plugin providing read and write facilities for Kafka. The reader facilities automatically discover broker locations from ZooKeeper.
 
 #### Installation
 
@@ -20,7 +20,7 @@ In your peer boot-up namespace:
 
 ##### read-messages
 
-Reads segments from a Kafka topic.
+Reads segments from one Kafka topic's partition.
 
 Catalog entry:
 
