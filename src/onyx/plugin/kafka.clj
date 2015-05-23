@@ -65,6 +65,14 @@
     (catch Throwable e
       (fatal e))))
 
+(defn kw->fn [kw]
+  (try
+    (let [user-ns (symbol (name (namespace kw)))
+          user-fn (symbol (name kw))]
+      (or (ns-resolve user-ns user-fn) (throw (Exception.))))
+    (catch Throwable e
+      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:symbol kw})))))
+
 (defn reader-loop [m client-id group-id topic partitions kpartition task-map ch pending-commits]
   (try
     (loop []
@@ -77,13 +85,14 @@
               messages (kc/messages consumer "onyx" topic kpartition offset fetch-size)
               empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
               commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-              commit-fut (future (commit-loop group-id m topic kpartition commit-interval pending-commits))]
+              commit-fut (future (commit-loop group-id m topic kpartition commit-interval pending-commits))
+              deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))]
           (log/info "Opening Kafka consumer" task-map)
           (log/info (str "Kafka consumer is starting at offset " offset))
           (try
             (loop [ms messages]
               (if (first ms)
-                (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
+                (>!! ch {:message (deserializer-fn (.value ^KafkaMessage (first ms)))
                          :offset (.offset ^int (first ms))})
                 (Thread/sleep empty-read-back-off))
               (recur (rest ms)))
@@ -164,22 +173,22 @@
 (defn inject-write-messages
   [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
   (let [config {"metadata.broker.list" (:kafka/brokers task-map)
-                "serializer.class" (:kafka/serializer-class task-map)
                 "partitioner.class" (:kafka/partitioner-class task-map)}]
     {:kafka/config config
      :kafka/topic (:kafka/topic task-map)
+     :kafka/serializer-fn (kw->fn (:kafka/serializer-fn task-map))
      :kafka/producer (kp/producer config)}))
 
 (defmethod p-ext/write-batch :kafka/write-messages
-  [{:keys [onyx.core/results kafka/producer kafka/topic]}]
+  [{:keys [onyx.core/results kafka/producer kafka/topic kafka/serializer-fn]}]
   (let [messages (mapcat :leaves results)]
     (doseq [m (map :message messages)]
-      (kp/send-message producer (kp/message topic (.getBytes (pr-str m))))))
+      (kp/send-message producer (kp/message topic (serializer-fn m)))))
   {})
 
 (defmethod p-ext/seal-resource :kafka/write-messages
-  [{:keys [kafka/producer kafka/topic]}]
-  (kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
+  [{:keys [kafka/producer kafka/topic kafka/serializer-fn]}]
+  (kp/send-message producer (kp/message topic (serializer-fn :done)))
   {})
 
 (def read-messages-calls

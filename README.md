@@ -39,6 +39,7 @@ Catalog entry:
  :kafka/force-reset? true
  :kafka/empty-read-back-off 500
  :kafka/commit-interval 500
+ :kafka/deserializer-fn :my.ns/deserializer-fn
  :onyx/max-peers 1
  :onyx/batch-size 100
  :onyx/doc "Reads messages from a Kafka topic"}
@@ -64,7 +65,7 @@ Catalog entry:
  :onyx/medium :kafka
  :kafka/topic "topic"
  :kafka/brokers "127.0.0.1:9092"
- :kafka/serializer-class "kafka.serializer.DefaultEncoder"
+ :kafka/serializer-fn :my.ns/serializer-fn
  :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
  :onyx/batch-size batch-size
  :onyx/doc "Writes messages to a Kafka topic"}
@@ -91,6 +92,8 @@ Lifecycle entry:
 |`:kafka/fetch-size`         | `integer` |`307200` | The size in bytes to request from ZooKeeper per fetch request
 |`:kafka/empty-read-back-off`| `integer` |`500`    | The amount of time to back off between reads when nothing was fetched from a consumer
 |`:kafka/commit-interval`    | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
+|`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
+|`:kafka/deserializer-fn`    | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
 
 #### Contributing
 

@@ -40,6 +40,9 @@
 (kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 3}))))
 (kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
 
+(defn deserialize-message [bytes]
+  (read-string (String. bytes "UTF-8")))
+
 (def workflow
   [[:read-messages :identity]
    [:identity :out]])
@@ -59,6 +62,7 @@
     :kafka/force-reset? true
     :kafka/empty-read-back-off 500
     :kafka/commit-interval 500
+    :kafka/deserializer-fn :onyx.plugin.input-test/deserialize-message
     :onyx/max-peers 1
     :onyx/batch-size 100
     :onyx/doc "Reads messages from a Kafka topic"}
@@ -103,11 +107,9 @@
 
 (fact results => [{:n 1} {:n 2} {:n 3} :done])
 
-(do
-  (doseq [v-peer v-peers]
-    (onyx.api/shutdown-peer v-peer))
+(doseq [v-peer v-peers]
+  (onyx.api/shutdown-peer v-peer))
 
-  (onyx.api/shutdown-peer-group peer-group)
+(onyx.api/shutdown-peer-group peer-group)
 
-  (onyx.api/shutdown-env env))
-
+(onyx.api/shutdown-env env)
