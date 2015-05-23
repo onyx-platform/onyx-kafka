@@ -40,6 +40,9 @@
 (kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 3}))))
 (kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
 
+(defn deserialize-message [bytes]
+  (read-string (String. bytes "UTF-8")))
+
 (def workflow
   [[:read-messages :identity]
    [:identity :out]])
@@ -50,9 +53,16 @@
     :onyx/type :input
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/partition "0"
     :kafka/group-id "onyx-consumer"
-    :kafka/offset-reset "smallest"
+    :kafka/fetch-size 307200
+    :kafka/chan-capacity 1000
+    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/offset-reset :smallest
+    :kafka/force-reset? true
+    :kafka/empty-read-back-off 500
+    :kafka/commit-interval 500
+    :kafka/deserializer-fn :onyx.plugin.input-test/deserialize-message
     :onyx/max-peers 1
     :onyx/batch-size 100
     :onyx/doc "Reads messages from a Kafka topic"}
@@ -93,7 +103,7 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def results (doall (map (fn [_] (read-string (String. (<!! out-chan) "UTF-8"))) (range 4))))
+(def results (doall (map (fn [_] (<!! out-chan)) (range 4))))
 
 (fact results => [{:n 1} {:n 2} {:n 3} :done])
 
@@ -103,4 +113,3 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-

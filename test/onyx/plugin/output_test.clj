@@ -34,6 +34,9 @@
   [[:in :identity]
    [:identity :write-messages]])
 
+(defn serialize-segment [segment]
+  (.getBytes (pr-str segment)))
+
 (def catalog
   [{:onyx/name :in
     :onyx/ident :core.async/read-from-chan
@@ -53,8 +56,8 @@
     :onyx/type :output
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/brokers "127.0.0.1:9092"
-    :kafka/serializer-class "kafka.serializer.DefaultEncoder"
+    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/serializer-fn :onyx.plugin.output-test/serialize-segment
     :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
     :onyx/batch-size 100
     :onyx/doc "Writes messages to a Kafka topic"}])
@@ -104,4 +107,3 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
-
