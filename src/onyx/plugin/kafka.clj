@@ -51,13 +51,13 @@
        (last)
        (last)))
 
-(defn commit-loop [consumer m topic kpartition commit-interval pending-commits]
+(defn commit-loop [group-id m topic kpartition commit-interval pending-commits]
   (try
     (loop []
       (Thread/sleep commit-interval)
       (when-let [offset (highest-offset-to-commit @pending-commits)]
         (log/info "Writing offset to ZooKeeper: " offset)
-        (kzk/set-offset! m consumer topic kpartition offset)
+        (kzk/set-offset! m group-id topic kpartition offset)
         (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
       (recur))
     (catch InterruptedException e
@@ -77,7 +77,7 @@
               messages (kc/messages consumer "onyx" topic kpartition offset fetch-size)
               empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
               commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-              commit-fut (future (commit-loop consumer m topic kpartition commit-interval pending-commits))]
+              commit-fut (future (commit-loop group-id m topic kpartition commit-interval pending-commits))]
           (log/info "Opening Kafka consumer" task-map)
           (log/info (str "Kafka consumer is starting at offset " offset))
           (try
