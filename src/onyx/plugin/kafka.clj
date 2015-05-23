@@ -172,7 +172,8 @@
 
 (defn inject-write-messages
   [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
-  (let [config {"metadata.broker.list" (:kafka/brokers task-map)
+  (let [bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
+        config {"metadata.broker.list" bl
                 "partitioner.class" (:kafka/partitioner-class task-map)}]
     {:kafka/config config
      :kafka/topic (:kafka/topic task-map)

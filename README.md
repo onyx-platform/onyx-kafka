@@ -1,6 +1,6 @@
 ## onyx-kafka
 
-Onyx plugin providing read and write facilities for Kafka. The reader facilities automatically discover broker locations from ZooKeeper.
+Onyx plugin providing read and write facilities for Kafka. This plugin utomatically discovers broker locations from ZooKeeper and updates the consumers when there is a broker failover.
 
 #### Installation
 
@@ -64,7 +64,7 @@ Catalog entry:
  :onyx/type :output
  :onyx/medium :kafka
  :kafka/topic "topic"
- :kafka/brokers "127.0.0.1:9092"
+ :kafka/zookeeper "127.0.0.1:2181"
  :kafka/serializer-fn :my.ns/serializer-fn
  :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
  :onyx/batch-size batch-size

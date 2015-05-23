@@ -56,7 +56,7 @@
     :onyx/type :output
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/brokers "127.0.0.1:9092"
+    :kafka/zookeeper "127.0.0.1:2181"
     :kafka/serializer-fn :onyx.plugin.output-test/serialize-segment
     :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
     :onyx/batch-size 100
