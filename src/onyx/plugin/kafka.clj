@@ -30,19 +30,19 @@
          broker-ids)))
       [])))
 
-(defn read-from-bound [consumer topic partition task-map]
+(defn read-from-bound [consumer topic kpartition task-map]
   (cond (= (:kafka/offset-reset task-map) :smallest)
-        (kc/topic-offset consumer topic partition :earliest)
+        (kc/topic-offset consumer topic kpartition :earliest)
         (= (:kafka/offset-reset task-map) :largest)
-        (kc/topic-offset consumer topic partition :latest)
+        (kc/topic-offset consumer topic kpartition :latest)
         :else (throw (ex-info ":kafka/offset-reset must be either :smallest or :largest" {:task-map task-map}))))
 
-(defn starting-offset [m consumer topic partition group-id task-map]
+(defn starting-offset [m consumer topic kpartition group-id task-map]
   (if (:kafka/force-reset? task-map)
-    (read-from-bound consumer topic partition task-map)
-    (if-let [x (kzk/committed-offset m group-id topic partition)]
+    (read-from-bound consumer topic kpartition task-map)
+    (if-let [x (kzk/committed-offset m group-id topic kpartition)]
       x
-      (read-from-bound consumer topic partition task-map))))
+      (read-from-bound consumer topic kpartition task-map))))
 
 (defn highest-offset-to-commit [offsets]
   (->> (partition-all 2 1 offsets)
@@ -51,54 +51,63 @@
        (last)
        (last)))
 
+(defn commit-loop [consumer m topic kpartition commit-interval pending-commits]
+  (future
+    (try
+      (loop []
+        (Thread/sleep commit-interval)
+        (when-let [offset (highest-offset-to-commit @pending-commits)]
+          (kzk/set-offset! m consumer topic kpartition offset)
+          (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
+        (recur))
+      (catch InterruptedException e
+        (throw e))
+      (catch Throwable e
+        (fatal e)))))
+
+(defn reader-loop [m client-id group-id topic partitions kpartition task-map ch pending-commits]
+  (try
+    (loop []
+      (try
+        (let [brokers (get partitions (str kpartition))
+              broker (get (id->broker m) (first brokers))
+              consumer (kc/consumer (:host broker) (:port broker) client-id)
+              offset (starting-offset m consumer topic kpartition group-id task-map)
+              fetch-size (or (:kafka/fetch-size task-map) (:kafka/fetch-size defaults))
+              messages (kc/messages consumer "onyx" topic kpartition offset fetch-size)
+              empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
+              commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
+              commit-fut (future (commit-loop m topic kpartition commit-interval pending-commits))]
+          (log/debug "Opening Kafka consumer" task-map)
+          (log/debug (str "Kafka consumer is starting at offset " offset))
+          (loop [ms messages]
+            (if (first ms)
+              (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
+                       :offset (.offset ^int (first ms))})
+              (Thread/sleep empty-read-back-off))
+            (recur (rest ms))))
+        (catch InterruptedException e
+          (throw e))
+        (catch Throwable e
+          (fatal e))))
+    (catch InterruptedException e
+      (throw e))))
+
 (defn start-kafka-consumer
   [{:keys [onyx.core/task-map] :as event} lifecycle]
   (let [{:keys [kafka/topic kafka/partition kafka/group-id]} task-map
-        fetch-size (or (:kafka/fetch-size task-map) (:kafka/fetch-size defaults))
-        chan-capacity (or (:kafka/chan-capacity task-map) (:kafka/chan-capacity defaults))
-        empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
+        kpartition (Integer/parseInt partition)
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-        partition (Integer/parseInt partition)
+        chan-capacity (or (:kafka/chan-capacity task-map) (:kafka/chan-capacity defaults))
         client-id "onyx"
         m {"zookeeper.connect" (:kafka/zookeeper task-map)}
         partitions (kzk/partitions m topic)
-        brokers (get partitions (str partition))
-        broker (get (id->broker m) (first brokers))
-        consumer (kc/consumer (:host broker) (:port broker) client-id)
-        offset (starting-offset m consumer topic partition group-id task-map)
-        messages (kc/messages consumer "onyx" topic partition offset fetch-size)
         ch (chan chan-capacity)
         pending-messages (atom {})
         pending-commits (atom (sorted-set))
-        reader-fut (future
-                     (try
-                       (log/debug "Opening Kafka consumer" task-map)
-                       (log/debug (str "Kafka consumer is starting at offset " offset))
-                       (loop [ms messages]
-                         (if (first ms)
-                           (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
-                                    :offset (.offset ^int (first ms))})
-                           (Thread/sleep empty-read-back-off))
-                         (recur (rest ms)))
-                       (catch InterruptedException e)
-                       (catch Throwable e
-                         (fatal e))))
-        commit-fut (future
-                     (try
-                       (loop []
-                         (Thread/sleep commit-interval)
-                         (when-let [offset (highest-offset-to-commit @pending-commits)]
-                           (kzk/set-offset! m consumer topic partition offset)
-                           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
-                         (recur))
-                       (catch InterruptedException e)
-                       (catch Throwable e
-                         (fatal e))))]
-    {:kafka/consumer consumer
-     :kafka/messages messages
-     :kafka/read-ch ch
+        reader-fut (future (reader-loop m client-id group-id topic partitions kpartition task-map ch pending-commits))]
+    {:kafka/read-ch ch
      :kafka/reader-future reader-fut
-     :kafka/commit-future commit-fut
      :kafka/pending-messages pending-messages
      :kafka/pending-commits pending-commits}))
 
@@ -146,7 +155,6 @@
 (defn close-read-messages
   [{:keys [kafka/read-ch] :as pipeline} lifecycle]
   (future-cancel (:kafka/reader-future pipeline))
-  (future-cancel (:kafka/commit-future pipeline))
   (close! read-ch)
   {})
 
