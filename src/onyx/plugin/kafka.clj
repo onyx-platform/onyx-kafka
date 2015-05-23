@@ -52,18 +52,18 @@
        (last)))
 
 (defn commit-loop [consumer m topic kpartition commit-interval pending-commits]
-  (future
-    (try
-      (loop []
-        (Thread/sleep commit-interval)
-        (when-let [offset (highest-offset-to-commit @pending-commits)]
-          (kzk/set-offset! m consumer topic kpartition offset)
-          (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
-        (recur))
-      (catch InterruptedException e
-        (throw e))
-      (catch Throwable e
-        (fatal e)))))
+  (try
+    (loop []
+      (Thread/sleep commit-interval)
+      (when-let [offset (highest-offset-to-commit @pending-commits)]
+        (log/info "Writing offset to ZooKeeper: " offset)
+        (kzk/set-offset! m consumer topic kpartition offset)
+        (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
+      (recur))
+    (catch InterruptedException e
+      (throw e))
+    (catch Throwable e
+      (fatal e))))
 
 (defn reader-loop [m client-id group-id topic partitions kpartition task-map ch pending-commits]
   (try
@@ -77,15 +77,18 @@
               messages (kc/messages consumer "onyx" topic kpartition offset fetch-size)
               empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
               commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-              commit-fut (future (commit-loop m topic kpartition commit-interval pending-commits))]
-          (log/debug "Opening Kafka consumer" task-map)
-          (log/debug (str "Kafka consumer is starting at offset " offset))
-          (loop [ms messages]
-            (if (first ms)
-              (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
-                       :offset (.offset ^int (first ms))})
-              (Thread/sleep empty-read-back-off))
-            (recur (rest ms))))
+              commit-fut (future (commit-loop consumer m topic kpartition commit-interval pending-commits))]
+          (log/info "Opening Kafka consumer" task-map)
+          (log/info (str "Kafka consumer is starting at offset " offset))
+          (try
+            (loop [ms messages]
+              (if (first ms)
+                (>!! ch {:message (read-string (String. (.value ^KafkaMessage (first ms)) "UTF-8"))
+                         :offset (.offset ^int (first ms))})
+                (Thread/sleep empty-read-back-off))
+              (recur (rest ms)))
+            (finally
+             (future-cancel commit-fut))))
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
@@ -117,7 +120,7 @@
         max-pending (or (:onyx/max-pending task-map) 10000)
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
-        ms (or (:onyx/batch-timeout task-map) 500)
+        ms (or (:onyx/batch-timeout task-map) 50)
         timeout-ch (timeout ms)
         batch (->> (range max-segments)
                    (map (fn [_]
@@ -133,7 +136,7 @@
 
 (defmethod p-ext/ack-message :kafka/read-messages
   [{:keys [kafka/pending-messages kafka/pending-commits onyx.core/log onyx.core/task-id]} message-id]
-  (when-let [offset (:offset (get pending-messages message-id))]
+  (when-let [offset (:offset (get @pending-messages message-id))]
     (swap! pending-commits conj offset))
   (swap! pending-messages dissoc message-id))
 
