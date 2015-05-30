@@ -7,6 +7,7 @@
             [cheshire.core :refer [parse-string]]
             [zookeeper :as zk]
             [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.operation :refer [kw->fn]]
             [taoensso.timbre :as log :refer [fatal]])
   (:import [clj_kafka.core KafkaMessage]))
 
@@ -64,14 +65,6 @@
       (throw e))
     (catch Throwable e
       (fatal e))))
-
-(defn kw->fn [kw]
-  (try
-    (let [user-ns (symbol (name (namespace kw)))
-          user-fn (symbol (name kw))]
-      (or (ns-resolve user-ns user-fn) (throw (Exception.))))
-    (catch Throwable e
-      (throw (ex-info "Could not resolve symbol on the classpath, did you require the file that contains this symbol?" {:symbol kw})))))
 
 (defn reader-loop [m client-id group-id topic partitions kpartition task-map ch pending-commits]
   (try
