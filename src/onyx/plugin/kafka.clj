@@ -66,8 +66,6 @@
     (catch Throwable e
       (fatal e))))
 
-
-
 (defn reader-loop [m client-id group-id topic partitions kpartition task-map ch pending-commits]
   (try
     (loop []
