@@ -75,7 +75,6 @@
               consumer (kc/consumer (:host broker) (:port broker) client-id)
               offset (starting-offset m consumer topic kpartition group-id task-map)
               fetch-size (or (:kafka/fetch-size task-map) (:kafka/fetch-size defaults))
-              messages (kc/messages consumer "onyx" topic kpartition offset fetch-size)
               empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
               commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
               commit-fut (future (commit-loop group-id m topic kpartition commit-interval pending-commits))
@@ -83,12 +82,16 @@
           (log/info "Opening Kafka consumer" task-map)
           (log/info (str "Kafka consumer is starting at offset " offset))
           (try
-            (loop [ms messages]
+            (loop [ms (kc/messages consumer "onyx" topic kpartition offset fetch-size)
+                   head-offset offset]
               (if (first ms)
-                (>!! ch {:message (deserializer-fn (.value ^KafkaMessage (first ms)))
-                         :offset (.offset ^int (first ms))})
-                (Thread/sleep empty-read-back-off))
-              (recur (rest ms)))
+                (let [next-offset (.offset ^int (first ms))]
+                  (>!! ch {:message (deserializer-fn (.value ^KafkaMessage (first ms)))
+                           :offset next-offset})
+                  (recur (rest ms) next-offset))
+                (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
+                  (Thread/sleep empty-read-back-off)
+                  (recur fetched head-offset))))
             (finally
              (future-cancel commit-fut))))
         (catch InterruptedException e
