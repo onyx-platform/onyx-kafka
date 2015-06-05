@@ -84,14 +84,14 @@
           (try
             (loop [ms (kc/messages consumer "onyx" topic kpartition offset fetch-size)
                    head-offset offset]
-              (if (first ms)
+              (if-not (seq ms)
+                (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
+                  (Thread/sleep empty-read-back-off)
+                  (recur fetched head-offset))
                 (let [next-offset (.offset ^int (first ms))]
                   (>!! ch {:message (deserializer-fn (.value ^KafkaMessage (first ms)))
                            :offset next-offset})
-                  (recur (rest ms) next-offset))
-                (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
-                  (Thread/sleep empty-read-back-off)
-                  (recur fetched head-offset))))
+                  (recur (rest ms) (inc next-offset)))))
             (finally
              (future-cancel commit-fut))))
         (catch InterruptedException e
@@ -117,10 +117,11 @@
     {:kafka/read-ch ch
      :kafka/reader-future reader-fut
      :kafka/pending-messages pending-messages
-     :kafka/pending-commits pending-commits}))
+     :kafka/pending-commits pending-commits
+     :kafka/drained? (atom false)}))
 
 (defmethod p-ext/read-batch :kafka/read-messages
-  [{:keys [kafka/read-ch kafka/pending-messages onyx.core/task-map] :as event}]
+  [{:keys [kafka/read-ch kafka/pending-messages kafka/drained? onyx.core/task-map] :as event}]
   (let [pending (count (keys @pending-messages))
         max-pending (or (:onyx/max-pending task-map) 10000)
         batch-size (:onyx/batch-size task-map)
@@ -130,13 +131,21 @@
         batch (->> (range max-segments)
                    (map (fn [_]
                           (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
-                            {:id (java.util.UUID/randomUUID)
-                             :input :kafka
-                             :message (:message result)
-                             :offset (:offset result)})))
+                            (if (= (:message result) :done)
+                              {:id (java.util.UUID/randomUUID)
+                               :input :kafka
+                               :message :done}
+                              {:id (java.util.UUID/randomUUID)
+                               :input :kafka
+                               :message (:message result)
+                               :offset (:offset result)}))))
                    (remove (comp nil? :message)))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (select-keys m [:message :offset])))
+    (when (and (= 1 (count @pending-messages))
+               (= (count batch) 1)
+               (= (:message (first batch)) :done))
+      (reset! drained? true))
     {:onyx.core/batch batch}))
 
 (defmethod p-ext/ack-message :kafka/read-messages
@@ -147,18 +156,17 @@
 
 (defmethod p-ext/retry-message :kafka/read-messages
   [{:keys [kafka/pending-messages kafka/read-ch onyx.core/log]} message-id]
-  (>!! read-ch (get @pending-messages message-id))
-  (swap! pending-messages dissoc message-id))
+  (when-let [msg (get @pending-messages message-id)]
+    (swap! pending-messages dissoc message-id)
+    (>!! read-ch msg)))
 
 (defmethod p-ext/pending? :kafka/read-messages
   [{:keys [kafka/pending-messages]} message-id]
   (get @pending-messages message-id))
 
 (defmethod p-ext/drained? :kafka/read-messages
-  [{:keys [kafka/pending-messages]}]
-  (let [x @pending-messages]
-    (and (= (count (keys x)) 1)
-         (= (first (map :message (vals x))) :done))))
+  [{:keys [kafka/drained?]}]
+  @drained?)
 
 (defn close-read-messages
   [{:keys [kafka/read-ch] :as pipeline} lifecycle]
