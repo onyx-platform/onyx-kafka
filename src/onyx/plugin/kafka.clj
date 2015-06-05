@@ -46,7 +46,8 @@
       (read-from-bound consumer topic kpartition task-map))))
 
 (defn highest-offset-to-commit [offsets]
-  (->> (partition-all 2 1 offsets)
+  (->> (sort offsets)
+       (partition-all 2 1)
        (partition-by #(- (or (second %) (first %)) (first %)))
        (first)
        (last)
