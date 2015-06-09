@@ -1,13 +1,13 @@
 ## onyx-kafka
 
-Onyx plugin providing read and write facilities for Kafka. This plugin utomatically discovers broker locations from ZooKeeper and updates the consumers when there is a broker failover.
+Onyx plugin providing read and write facilities for Kafka. This plugin automatically discovers broker locations from ZooKeeper and updates the consumers when there is a broker failover.
 
 #### Installation
 
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.6.0-RC1"]
+[org.onyxplatform/onyx-kafka "0.6.0"]
 ```
 
 In your peer boot-up namespace:
@@ -87,7 +87,7 @@ Lifecycle entry:
 |`:kafka/group-id`           | `string`  |         | The consumer identity to store in ZooKeeper
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
 |`:kafka/offset-reset`       | `keyword` |         | Offset bound to seek to when not found - `:smallest` or `:largest`
-|`:kafka/force-reset?`       | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the lack acknowledged messsage if it exists
+|`:kafka/force-reset?`       | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the last acknowledged messsage if it exists
 |`:kafka/chan-capacity`      | `integer` |`1000`   | The buffer size of the Kafka reading channel
 |`:kafka/fetch-size`         | `integer` |`307200` | The size in bytes to request from ZooKeeper per fetch request
 |`:kafka/empty-read-back-off`| `integer` |`500`    | The amount of time to back off between reads when nothing was fetched from a consumer
