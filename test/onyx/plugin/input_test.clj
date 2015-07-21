@@ -49,7 +49,7 @@
 
 (def catalog
   [{:onyx/name :read-messages
-    :onyx/ident :kafka/read-messages
+    :onyx/plugin :onyx.plugin.kafka/input
     :onyx/type :input
     :onyx/medium :kafka
     :kafka/topic topic
@@ -73,7 +73,7 @@
     :onyx/batch-size 100}
 
    {:onyx/name :out
-    :onyx/ident :core.async/write-to-chan
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 100

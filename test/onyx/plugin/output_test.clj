@@ -39,7 +39,7 @@
 
 (def catalog
   [{:onyx/name :in
-    :onyx/ident :core.async/read-from-chan
+    :onyx/plugin :onyx.plugin.core-async/input
     :onyx/type :input
     :onyx/medium :core.async
     :onyx/max-peers 1
@@ -52,11 +52,11 @@
     :onyx/batch-size 100}
 
    {:onyx/name :write-messages
-    :onyx/ident :kafka/write-messages
+    :onyx/plugin :onyx.plugin.kafka/output
     :onyx/type :output
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/zookeeper "127.0.0.1:2188"
     :kafka/serializer-fn :onyx.plugin.output-test/serialize-segment
     :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
     :onyx/batch-size 100
@@ -91,7 +91,7 @@
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def config
-  {"zookeeper.connect" "127.0.0.1:2181"
+  {"zookeeper.connect" "127.0.0.1:2188"
    "group.id" "onyx-test-consumer"
    "auto.offset.reset" "smallest"
    "auto.commit.enable" "false"})
