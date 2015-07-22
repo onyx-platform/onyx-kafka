@@ -55,7 +55,7 @@
 
 (def catalog
   [{:onyx/name :read-messages
-    :onyx/plugin :onyx.plugin.kafka/input
+    :onyx/plugin :onyx.plugin.kafka/read-messages
     :onyx/type :input
     :onyx/medium :kafka
     :kafka/topic topic

@@ -52,7 +52,7 @@
     :onyx/batch-size 100}
 
    {:onyx/name :write-messages
-    :onyx/plugin :onyx.plugin.kafka/output
+    :onyx/plugin :onyx.plugin.kafka/write-messages
     :onyx/type :output
     :onyx/medium :kafka
     :kafka/topic topic
