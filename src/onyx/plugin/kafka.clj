@@ -7,6 +7,7 @@
             [cheshire.core :refer [parse-string]]
             [zookeeper :as zk]
             [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.types :as t]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.function :as function]
             [onyx.peer.operation :refer [kw->fn]]
@@ -44,7 +45,7 @@
   (if (:kafka/force-reset? task-map)
     (read-from-bound consumer topic kpartition task-map)
     (if-let [x (kzk/committed-offset m group-id topic kpartition)]
-      x
+      (inc x)
       (read-from-bound consumer topic kpartition task-map))))
 
 (defn highest-offset-to-commit [offsets]
@@ -60,7 +61,6 @@
     (loop []
       (Thread/sleep commit-interval)
       (when-let [offset (highest-offset-to-commit @pending-commits)]
-        (log/info "Writing offset to ZooKeeper: " offset)
         (kzk/set-offset! m group-id topic kpartition offset)
         (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
       (recur))
@@ -92,8 +92,9 @@
                   (Thread/sleep empty-read-back-off)
                   (recur fetched head-offset))
                 (let [next-offset (.offset ^int (first ms))]
-                  (>!! ch {:message (deserializer-fn (.value ^KafkaMessage (first ms)))
-                           :offset next-offset})
+                  (>!! ch (assoc (t/input (java.util.UUID/randomUUID)
+                                          (deserializer-fn (.value ^KafkaMessage (first ms))))
+                                 :offset next-offset))
                   (recur (rest ms) (inc next-offset)))))
             (finally
              (future-cancel commit-fut))))
@@ -136,16 +137,11 @@
                      (map (fn [_]
                             (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
                               (if (= (:message result) :done)
-                                {:id (java.util.UUID/randomUUID)
-                                 :input :kafka
-                                 :message :done}
-                                {:id (java.util.UUID/randomUUID)
-                                 :input :kafka
-                                 :message (:message result)
-                                 :offset (:offset result)}))))
+                                (t/input (java.util.UUID/randomUUID) :done)
+                                result))))
                      (filter :message))]
       (doseq [m batch]
-        (swap! pending-messages assoc (:id m) (select-keys m [:message :offset])))
+        (swap! pending-messages assoc (:id m) m))
       (when (and (= 1 (count @pending-messages))
                  (= (count batch) 1)
                  (= (:message (first batch)) :done))
@@ -163,7 +159,8 @@
     [_ _ message-id]
     (when-let [msg (get @pending-messages message-id)]
       (swap! pending-messages dissoc message-id)
-      (>!! read-ch msg)))
+      (>!! read-ch (t/input (java.util.UUID/randomUUID)
+                            (:message msg)))))
 
   (pending?
     [_ _ message-id]
