@@ -26,7 +26,7 @@ Catalog entry:
 
 ```clojure
 {:onyx/name :read-messages
- :onyx/ident :kafka/read-messages
+ :onyx/plugin :onyx.plugin.kafka/read-messages
  :onyx/type :input
  :onyx/medium :kafka
  :kafka/topic "my topic"
@@ -60,7 +60,7 @@ Catalog entry:
 
 ```clojure
 {:onyx/name :write-messages
- :onyx/ident :kafka/write-messages
+ :onyx/plugin :onyx.plugin.kafka/write-messages
  :onyx/type :output
  :onyx/medium :kafka
  :kafka/topic "topic"

@@ -122,8 +122,8 @@
      :kafka/pending-messages pending-messages
      :kafka/pending-commits pending-commits}))
 
-(defrecord KafkaInput [max-pending batch-size batch-timeout pending-messages 
-                       pending-commits drained? read-ch]
+(defrecord KafkaReadMessages [max-pending batch-size batch-timeout pending-messages 
+                              pending-commits drained? read-ch]
   p-ext/Pipeline
   (write-batch 
     [this event]
@@ -170,7 +170,7 @@
     [_ _]
     @drained?))
 
-(defn input [pipeline-data]
+(defn read-messages [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
         max-pending (arg-or-default :onyx/max-pending catalog-entry)
         batch-size (:onyx/batch-size catalog-entry)
@@ -196,7 +196,7 @@
    :kafka/serializer-fn (:serializer-fn pipeline)
    :kafka/producer (:producer pipeline)})
 
-(defrecord KafkaOutput [config topic producer serializer-fn]
+(defrecord KafkaWriteMessages [config topic producer serializer-fn]
   p-ext/Pipeline
   (read-batch 
     [_ event]
@@ -213,7 +213,7 @@
     [_ {:keys [onyx.core/results]}]
     (kp/send-message producer (kp/message topic (serializer-fn :done)))))
 
-(defn output [pipeline-data]
+(defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
         bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
         config {"metadata.broker.list" bl
@@ -221,7 +221,7 @@
         topic (:kafka/topic task-map)
         producer (kp/producer config)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))]
-    (->KafkaOutput config topic producer serializer-fn)))
+    (->KafkaWriteMessages config topic producer serializer-fn)))
 
 (def read-messages-calls
   {:lifecycle/before-task-start start-kafka-consumer
