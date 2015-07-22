@@ -10,12 +10,12 @@ machine:
 dependencies:
   pre:
     - bash ./install-kafka.sh
-    - bash ./install-zookeeper.sh
     - /home/ubuntu/onyx-kafka/kafka_2.9.2-0.8.2.1/bin/kafka-server-start.sh /home/ubuntu/onyx-kafka/kafka_2.9.2-0.8.2.1/config/server.properties:
         background: true
+    - bash ./install-zookeeper.sh
+    - ./zookeeper-3.4.6/bin/zkServer.sh start-foreground:
+        background: true
   cache_directories:
-    - Aeron
-    - Agrona
     - kafka_2.9.2-0.8.2.1
 
 notify:
