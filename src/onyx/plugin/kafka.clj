@@ -180,8 +180,8 @@
         pending-messages (atom {})
         pending-commits (atom (sorted-set))
         drained? (atom false)]
-    (->KafkaInput max-pending batch-size batch-timeout 
-                  pending-messages pending-commits drained? ch)))
+    (->KafkaReadMessages max-pending batch-size batch-timeout 
+                         pending-messages pending-commits drained? ch)))
 
 (defn close-read-messages
   [{:keys [kafka/read-ch] :as pipeline} lifecycle]
