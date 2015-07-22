@@ -56,7 +56,7 @@
     :onyx/type :output
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/zookeeper "127.0.0.1:2188"
+    :kafka/zookeeper "127.0.0.1:2181"
     :kafka/serializer-fn :onyx.plugin.output-test/serialize-segment
     :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
     :onyx/batch-size 100
@@ -91,7 +91,7 @@
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def config
-  {"zookeeper.connect" "127.0.0.1:2188"
+  {"zookeeper.connect" "127.0.0.1:2181"
    "group.id" "onyx-test-consumer"
    "auto.offset.reset" "smallest"
    "auto.commit.enable" "false"})

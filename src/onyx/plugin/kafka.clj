@@ -143,7 +143,7 @@
                                  :input :kafka
                                  :message (:message result)
                                  :offset (:offset result)}))))
-                     (remove (comp nil? :message)))]
+                     (filter :message))]
       (doseq [m batch]
         (swap! pending-messages assoc (:id m) (select-keys m [:message :offset])))
       (when (and (= 1 (count @pending-messages))
@@ -193,16 +193,13 @@
   {})
 
 (defn inject-write-messages
-  [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
-  (let [bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
-        config {"metadata.broker.list" bl
-                "partitioner.class" (:kafka/partitioner-class task-map)}]
-    {:kafka/config config
-     :kafka/topic (:kafka/topic task-map)
-     :kafka/serializer-fn (kw->fn (:kafka/serializer-fn task-map))
-     :kafka/producer (kp/producer config)}))
+  [{:keys [onyx.core/pipeline] :as pipeline} lifecycle]
+  {:kafka/config (:config pipeline)
+   :kafka/topic (:topic pipeline)
+   :kafka/serializer-fn (:serializer-fn pipeline)
+   :kafka/producer (:producer pipeline)})
 
-(defrecord KafkaOutput []
+(defrecord KafkaOutput [config topic producer serializer-fn]
   p-ext/Pipeline
   (read-batch 
     [_ event]
@@ -216,11 +213,18 @@
     {})
 
   (seal-resource 
-    [_ {:keys [onyx.core/results kafka/topic kafka/producer kafka/serializer-fn]}]
+    [_ {:keys [onyx.core/results]}]
     (kp/send-message producer (kp/message topic (serializer-fn :done)))))
 
 (defn output [pipeline-data]
-    (->KafkaOutput))
+  (let [task-map (:onyx.core/task-map pipeline-data)
+        bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
+        config {"metadata.broker.list" bl
+                "partitioner.class" (:kafka/partitioner-class task-map)}
+        topic (:kafka/topic task-map)
+        producer (kp/producer config)
+        serializer-fn (kw->fn (:kafka/serializer-fn task-map))]
+    (->KafkaOutput config topic producer serializer-fn)))
 
 (def read-messages-calls
   {:lifecycle/before-task-start start-kafka-consumer
