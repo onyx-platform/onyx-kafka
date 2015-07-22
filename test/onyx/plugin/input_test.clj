@@ -73,7 +73,7 @@
     :onyx/batch-size 100}
 
    {:onyx/name :out
-    :onyx/plugin :onyx.plugin.core-async/write-messages
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size 100
