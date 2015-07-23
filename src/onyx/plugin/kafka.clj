@@ -150,21 +150,21 @@
 
   p-ext/PipelineInput
 
-  (ack-message [_ _ message-id]
-    (when-let [offset (:offset (get @pending-messages message-id))]
+  (ack-segment [_ _ segment-id]
+    (when-let [offset (:offset (get @pending-messages segment-id))]
       (swap! pending-commits conj offset))
-    (swap! pending-messages dissoc message-id))
+    (swap! pending-messages dissoc segment-id))
 
-  (retry-message 
-    [_ _ message-id]
-    (when-let [msg (get @pending-messages message-id)]
-      (swap! pending-messages dissoc message-id)
+  (retry-segment 
+    [_ _ segment-id]
+    (when-let [msg (get @pending-messages segment-id)]
+      (swap! pending-messages dissoc segment-id)
       (>!! read-ch (t/input (java.util.UUID/randomUUID)
                             (:message msg)))))
 
   (pending?
-    [_ _ message-id]
-    (get @pending-messages message-id))
+    [_ _ segment-id]
+    (get @pending-messages segment-id))
 
   (drained? 
     [_ _]
