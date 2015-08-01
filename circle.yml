@@ -1,7 +1,7 @@
 test:
   override:
     - lein with-profile dev,circle-ci midje:
-        timeout: 60
+        timeout: 120 
 
 machine:
   java:
@@ -9,13 +9,13 @@ machine:
 
 dependencies:
   pre:
-    - bash ./install-aeron.sh
     - bash ./install-kafka.sh
     - /home/ubuntu/onyx-kafka/kafka_2.9.2-0.8.2.1/bin/kafka-server-start.sh /home/ubuntu/onyx-kafka/kafka_2.9.2-0.8.2.1/config/server.properties:
         background: true
+    - bash ./install-zookeeper.sh
+    - ./zookeeper-3.4.6/bin/zkServer.sh start-foreground:
+        background: true
   cache_directories:
-    - Aeron
-    - Agrona
     - kafka_2.9.2-0.8.2.1
 
 notify:

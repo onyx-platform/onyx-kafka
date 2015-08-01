@@ -6,7 +6,10 @@
             [clj-kafka.core :as k]
             [cheshire.core :refer [parse-string]]
             [zookeeper :as zk]
+            [onyx.static.default-vals :refer [arg-or-default]]
+            [onyx.types :as t]
             [onyx.peer.pipeline-extensions :as p-ext]
+            [onyx.peer.function :as function]
             [onyx.peer.operation :refer [kw->fn]]
             [taoensso.timbre :as log :refer [fatal]])
   (:import [clj_kafka.core KafkaMessage]))
@@ -42,7 +45,7 @@
   (if (:kafka/force-reset? task-map)
     (read-from-bound consumer topic kpartition task-map)
     (if-let [x (kzk/committed-offset m group-id topic kpartition)]
-      x
+      (inc x)
       (read-from-bound consumer topic kpartition task-map))))
 
 (defn highest-offset-to-commit [offsets]
@@ -58,7 +61,6 @@
     (loop []
       (Thread/sleep commit-interval)
       (when-let [offset (highest-offset-to-commit @pending-commits)]
-        (log/info "Writing offset to ZooKeeper: " offset)
         (kzk/set-offset! m group-id topic kpartition offset)
         (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll))))
       (recur))
@@ -90,8 +92,9 @@
                   (Thread/sleep empty-read-back-off)
                   (recur fetched head-offset))
                 (let [next-offset (.offset ^int (first ms))]
-                  (>!! ch {:message (deserializer-fn (.value ^KafkaMessage (first ms)))
-                           :offset next-offset})
+                  (>!! ch (assoc (t/input (java.util.UUID/randomUUID)
+                                          (deserializer-fn (.value ^KafkaMessage (first ms))))
+                                 :offset next-offset))
                   (recur (rest ms) (inc next-offset)))))
             (finally
              (future-cancel commit-fut))))
@@ -103,71 +106,82 @@
       (throw e))))
 
 (defn start-kafka-consumer
-  [{:keys [onyx.core/task-map] :as event} lifecycle]
+  [{:keys [onyx.core/task-map onyx.core/pipeline] :as event} lifecycle]
   (let [{:keys [kafka/topic kafka/partition kafka/group-id]} task-map
         kpartition (Integer/parseInt partition)
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-        chan-capacity (or (:kafka/chan-capacity task-map) (:kafka/chan-capacity defaults))
         client-id "onyx"
         m {"zookeeper.connect" (:kafka/zookeeper task-map)}
         partitions (kzk/partitions m topic)
-        ch (chan chan-capacity)
-        pending-messages (atom {})
-        pending-commits (atom (sorted-set))
+        ch (:read-ch pipeline) 
+        pending-messages (:pending-messages pipeline)
+        pending-commits (:pending-commits pipeline)
         reader-fut (future (reader-loop m client-id group-id topic partitions kpartition task-map ch pending-commits))]
     {:kafka/read-ch ch
      :kafka/reader-future reader-fut
      :kafka/pending-messages pending-messages
-     :kafka/pending-commits pending-commits
-     :kafka/drained? (atom false)}))
+     :kafka/pending-commits pending-commits}))
 
-(defmethod p-ext/read-batch :kafka/read-messages
-  [{:keys [kafka/read-ch kafka/pending-messages kafka/drained? onyx.core/task-map] :as event}]
-  (let [pending (count (keys @pending-messages))
-        max-pending (or (:onyx/max-pending task-map) 10000)
-        batch-size (:onyx/batch-size task-map)
-        max-segments (min (- max-pending pending) batch-size)
-        ms (or (:onyx/batch-timeout task-map) 50)
-        timeout-ch (timeout ms)
-        batch (->> (range max-segments)
-                   (map (fn [_]
-                          (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
-                            (if (= (:message result) :done)
-                              {:id (java.util.UUID/randomUUID)
-                               :input :kafka
-                               :message :done}
-                              {:id (java.util.UUID/randomUUID)
-                               :input :kafka
-                               :message (:message result)
-                               :offset (:offset result)}))))
-                   (remove (comp nil? :message)))]
-    (doseq [m batch]
-      (swap! pending-messages assoc (:id m) (select-keys m [:message :offset])))
-    (when (and (= 1 (count @pending-messages))
-               (= (count batch) 1)
-               (= (:message (first batch)) :done))
-      (reset! drained? true))
-    {:onyx.core/batch batch}))
+(defrecord KafkaReadMessages [max-pending batch-size batch-timeout pending-messages 
+                              pending-commits drained? read-ch]
+  p-ext/Pipeline
+  (write-batch 
+    [this event]
+    (function/write-batch event))
 
-(defmethod p-ext/ack-message :kafka/read-messages
-  [{:keys [kafka/pending-messages kafka/pending-commits onyx.core/log onyx.core/task-id]} message-id]
-  (when-let [offset (:offset (get @pending-messages message-id))]
-    (swap! pending-commits conj offset))
-  (swap! pending-messages dissoc message-id))
+  (read-batch [_ event]
+    (let [pending (count (keys @pending-messages))
+          max-segments (min (- max-pending pending) batch-size)
+          timeout-ch (timeout batch-timeout)
+          batch (->> (range max-segments)
+                     (map (fn [_]
+                            (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
+                              (if (= (:message result) :done)
+                                (t/input (java.util.UUID/randomUUID) :done)
+                                result))))
+                     (filter :message))]
+      (doseq [m batch]
+        (swap! pending-messages assoc (:id m) m))
+      (when (and (= 1 (count @pending-messages))
+                 (= (count batch) 1)
+                 (= (:message (first batch)) :done))
+        (reset! drained? true))
+      {:onyx.core/batch batch}))
 
-(defmethod p-ext/retry-message :kafka/read-messages
-  [{:keys [kafka/pending-messages kafka/read-ch onyx.core/log]} message-id]
-  (when-let [msg (get @pending-messages message-id)]
-    (swap! pending-messages dissoc message-id)
-    (>!! read-ch msg)))
+  p-ext/PipelineInput
 
-(defmethod p-ext/pending? :kafka/read-messages
-  [{:keys [kafka/pending-messages]} message-id]
-  (get @pending-messages message-id))
+  (ack-segment [_ _ segment-id]
+    (when-let [offset (:offset (get @pending-messages segment-id))]
+      (swap! pending-commits conj offset))
+    (swap! pending-messages dissoc segment-id))
 
-(defmethod p-ext/drained? :kafka/read-messages
-  [{:keys [kafka/drained?]}]
-  @drained?)
+  (retry-segment 
+    [_ _ segment-id]
+    (when-let [msg (get @pending-messages segment-id)]
+      (swap! pending-messages dissoc segment-id)
+      (>!! read-ch (t/input (java.util.UUID/randomUUID)
+                            (:message msg)))))
+
+  (pending?
+    [_ _ segment-id]
+    (get @pending-messages segment-id))
+
+  (drained? 
+    [_ _]
+    @drained?))
+
+(defn read-messages [pipeline-data]
+  (let [catalog-entry (:onyx.core/task-map pipeline-data)
+        max-pending (arg-or-default :onyx/max-pending catalog-entry)
+        batch-size (:onyx/batch-size catalog-entry)
+        batch-timeout (arg-or-default :onyx/batch-timeout catalog-entry)
+        chan-capacity (or (:kafka/chan-capacity catalog-entry) (:kafka/chan-capacity defaults))
+        ch (chan chan-capacity)
+        pending-messages (atom {})
+        pending-commits (atom (sorted-set))
+        drained? (atom false)]
+    (->KafkaReadMessages max-pending batch-size batch-timeout 
+                         pending-messages pending-commits drained? ch)))
 
 (defn close-read-messages
   [{:keys [kafka/read-ch] :as pipeline} lifecycle]
@@ -176,26 +190,38 @@
   {})
 
 (defn inject-write-messages
-  [{:keys [onyx.core/task-map] :as pipeline} lifecycle]
-  (let [bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
+  [{:keys [onyx.core/pipeline] :as pipeline} lifecycle]
+  {:kafka/config (:config pipeline)
+   :kafka/topic (:topic pipeline)
+   :kafka/serializer-fn (:serializer-fn pipeline)
+   :kafka/producer (:producer pipeline)})
+
+(defrecord KafkaWriteMessages [config topic producer serializer-fn]
+  p-ext/Pipeline
+  (read-batch 
+    [_ event]
+    (function/read-batch event))
+
+  (write-batch 
+    [_ {:keys [onyx.core/results kafka/topic kafka/producer kafka/serializer-fn]}]
+    (let [messages (mapcat :leaves (:tree results))]
+      (doseq [m (map :message messages)]
+        (kp/send-message producer (kp/message topic (serializer-fn m)))))
+    {})
+
+  (seal-resource 
+    [_ {:keys [onyx.core/results]}]
+    (kp/send-message producer (kp/message topic (serializer-fn :done)))))
+
+(defn write-messages [pipeline-data]
+  (let [task-map (:onyx.core/task-map pipeline-data)
+        bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
         config {"metadata.broker.list" bl
-                "partitioner.class" (:kafka/partitioner-class task-map)}]
-    {:kafka/config config
-     :kafka/topic (:kafka/topic task-map)
-     :kafka/serializer-fn (kw->fn (:kafka/serializer-fn task-map))
-     :kafka/producer (kp/producer config)}))
-
-(defmethod p-ext/write-batch :kafka/write-messages
-  [{:keys [onyx.core/results kafka/producer kafka/topic kafka/serializer-fn]}]
-  (let [messages (mapcat :leaves results)]
-    (doseq [m (map :message messages)]
-      (kp/send-message producer (kp/message topic (serializer-fn m)))))
-  {})
-
-(defmethod p-ext/seal-resource :kafka/write-messages
-  [{:keys [kafka/producer kafka/topic kafka/serializer-fn]}]
-  (kp/send-message producer (kp/message topic (serializer-fn :done)))
-  {})
+                "partitioner.class" (:kafka/partitioner-class task-map)}
+        topic (:kafka/topic task-map)
+        producer (kp/producer config)
+        serializer-fn (kw->fn (:kafka/serializer-fn task-map))]
+    (->KafkaWriteMessages config topic producer serializer-fn)))
 
 (def read-messages-calls
   {:lifecycle/before-task-start start-kafka-consumer

@@ -1,12 +1,10 @@
-(defproject org.onyxplatform/onyx-kafka "0.6.0"
+(defproject org.onyxplatform/onyx-kafka "0.7.0-SNAPSHOT"
   :description "Onyx plugin for Kafka"
   :url "https://github.com/MichaelDrogalis/onyx-kafka"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [org.clojure/core.async "0.1.303.0-886421-alpha"]
-                 [org.onyxplatform/onyx "0.6.0" :exclusions [org.clojure/core.async]]
-                 [com.taoensso/timbre "3.0.1"]
+  :dependencies [[org.clojure/clojure "1.7.0"]
+                 [org.onyxplatform/onyx "0.7.0-SNAPSHOT"]
                  [clj-kafka "0.2.8-0.8.1.1" :exclusions [org.apache.zookeeper/zookeeper zookeeper-clj]]
                  [cheshire "5.4.0"]
                  [zookeeper-clj "0.9.1" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]]
