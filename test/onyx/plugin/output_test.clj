@@ -1,6 +1,8 @@
 (ns onyx.plugin.output-test
   (:require [clojure.core.async :refer [chan >!! <!!]]
             [onyx.plugin.core-async :refer [take-segments!]]
+            [onyx.kafka.embedded-server :as ke]
+            [com.stuartsierra.component :as component]
             [onyx.plugin.kafka]
             [clj-kafka.consumer.zk :as zk]
             [clj-kafka.core :as k]
@@ -25,6 +27,14 @@
    :onyx/id id})
 
 (def env (onyx.api/start-env env-config))
+
+(def kafka-server
+  (component/start 
+    (ke/map->EmbeddedKafka {:hostname "127.0.0.1" 
+                            :port 9092
+                            :broker-id 0
+                            :log-dir "/tmp/embedded-kafka2"
+                            :zookeeper-addr "127.0.0.1:2188"})))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
@@ -56,7 +66,7 @@
     :onyx/type :output
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/zookeeper "127.0.0.1:2188"
     :kafka/serializer-fn :onyx.plugin.output-test/serialize-segment
     :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
     :onyx/batch-size 100
@@ -91,7 +101,7 @@
   :task-scheduler :onyx.task-scheduler/balanced})
 
 (def config
-  {"zookeeper.connect" "127.0.0.1:2181"
+  {"zookeeper.connect" "127.0.0.1:2188"
    "group.id" "onyx-test-consumer"
    "auto.offset.reset" "smallest"
    "auto.commit.enable" "false"})
@@ -107,3 +117,5 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
+
+(component/stop kafka-server)

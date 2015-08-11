@@ -2,7 +2,9 @@
   (:require [clojure.core.async :refer [chan >!! <!!]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [onyx.plugin.kafka]
+            [com.stuartsierra.component :as component]
             [clj-kafka.producer :as kp]
+            [onyx.kafka.embedded-server :as ke]
             [onyx.api]
             [midje.sweet :refer :all]))
 
@@ -24,6 +26,14 @@
    :onyx/id id})
 
 (def env (onyx.api/start-env env-config))
+
+(def kafka-server
+  (component/start 
+    (ke/map->EmbeddedKafka {:hostname "127.0.0.1" 
+                            :port 9092
+                            :broker-id 0
+                            :log-dir "/tmp/embedded-kafka2"
+                            :zookeeper-addr "127.0.0.1:2188"})))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
@@ -63,7 +73,7 @@
     :kafka/group-id "onyx-consumer"
     :kafka/fetch-size 307200
     :kafka/chan-capacity 1000
-    :kafka/zookeeper "127.0.0.1:2181"
+    :kafka/zookeeper "127.0.0.1:2188"
     :kafka/offset-reset :smallest
     :kafka/force-reset? false
     :kafka/empty-read-back-off 500
@@ -133,3 +143,5 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
+
+(component/stop kafka-server)
