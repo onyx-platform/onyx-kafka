@@ -11,7 +11,7 @@
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.function :as function]
             [onyx.peer.operation :refer [kw->fn]]
-            [taoensso.timbre :as log :refer [fatal]])
+            [taoensso.timbre :as log :refer [fatal info]])
   (:import [clj_kafka.core KafkaMessage]))
 
 (def defaults
@@ -203,7 +203,7 @@
     (function/read-batch event))
 
   (write-batch 
-    [_ {:keys [onyx.core/results kafka/topic kafka/producer kafka/serializer-fn]}]
+    [_ {:keys [onyx.core/results]}]
     (let [messages (mapcat :leaves (:tree results))]
       (doseq [m (map :message messages)]
         (kp/send-message producer (kp/message topic (serializer-fn m)))))

@@ -32,7 +32,7 @@
     (ke/map->EmbeddedKafka {:hostname "127.0.0.1" 
                             :port 9092
                             :broker-id 0
-                            :log-dir "/tmp/embedded-kafka2"
+                            :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
                             :zookeeper-addr "127.0.0.1:2188"})))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
