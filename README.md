@@ -138,9 +138,7 @@ This can be used like so:
 			    ; :log-dir "/tmp/embedded-kafka"
 			    :zookeeper-addr "127.0.0.1:2188"})))
 
-
 ;; insert code to run a test here
-
 
 ;; stop the embedded server
 (component/stop kafka-server)
