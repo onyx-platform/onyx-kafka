@@ -104,7 +104,7 @@
 (let [segments (util/take-segments
                  (:zookeeper/address peer-config)
                  topic
-                 (fn [v] (read-string (String. v "UTF-8"))) (zk/messages c topic))]
+                 (fn [v] (read-string (String. v "UTF-8"))))]
   (fact segments
         => [{:n 0} {:n 1} {:n 2} :done]))
 
