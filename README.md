@@ -134,10 +134,9 @@ This can be used like so:
                             :port 9092
                             :broker-id 0
 			    :num-partitions 1
-			    ; optional log dir name - randomized dir will be created
-			    ; if none is supplied
-                            ; :log-dir "/tmp/embedded-kafka"
-                            :zookeeper-addr "127.0.0.1:2188"})))
+			    ; optional log dir name - randomized dir will be created if none is supplied
+			    ; :log-dir "/tmp/embedded-kafka"
+			    :zookeeper-addr "127.0.0.1:2188"})))
 
 
 ;; insert code to run a test here
