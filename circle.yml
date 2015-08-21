@@ -1,7 +1,7 @@
 test:
   override:
     - lein with-profile dev,circle-ci midje:
-        timeout: 240 
+        timeout: 480
 
 machine:
   java:
