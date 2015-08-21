@@ -2,7 +2,9 @@
   (:require [clj-kafka.consumer.zk :as zkconsumer]
             [clj-kafka.core :as zkcore]))
 
-(defn take-segments [zk-addr topic decompress-fn]
+(defn take-segments
+  "Reads segments from a topic until a :done is reached."
+  [zk-addr topic decompress-fn]
   (let [kafka-config {"zookeeper.connect" zk-addr
                       "group.id" "onyx-consumer"
                       "auto.offset.reset" "smallest"
