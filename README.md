@@ -106,8 +106,9 @@ topic, this will hang forever as there is no timeout.
 (ns your-ns.a-test
   (:require [onyx.kafka.utils :as kpu]))
 
-;; run a test job outputting to a topic
+;; insert code to run a job here
 
+;; retrieve the segments on the topic
 (def results
   (kpu/take-segments (:zookeeper/addr peer-config) "yourtopic" your-decompress-fn))
 
@@ -139,8 +140,10 @@ This can be used like so:
                             :zookeeper-addr "127.0.0.1:2188"})))
 
 
-;; perform a test
+;; insert code to run a test here
 
+
+;; stop the embedded server
 (component/stop kafka-server)
 
 ```
