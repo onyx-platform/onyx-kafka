@@ -119,7 +119,7 @@ topic, this will hang forever as there is no timeout.
 
 #### Embedded Kafka Server
 
-An embedded Kafka server is included for use in test cases.
+An embedded Kafka server is included for use in test cases where jobs output to kafka output tasks.
 
 This can be used like so:
 
