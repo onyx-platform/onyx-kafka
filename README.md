@@ -95,6 +95,54 @@ Lifecycle entry:
 |`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
 |`:kafka/deserializer-fn`    | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
 
+#### Test Utilities
+
+A take-segments utility function is provided for use when testing the results
+of jobs with kafka output tasks. take-segments reads from a topic until a :done
+is reached, and then returns the results. Note, if a `:done` is never written to a
+topic, this will hang forever as there is no timeout.
+
+```clojure
+(ns your-ns.a-test
+  (:require [onyx.kafka.utils :as kpu]))
+
+;; run a test job outputting to a topic
+
+(def results
+  (kpu/take-segments (:zookeeper/addr peer-config) "yourtopic" your-decompress-fn))
+
+(last results)
+; :done
+
+```
+
+#### Embedded Kafka Server
+
+An embedded Kafka server is included for use in test cases.
+
+This can be used like so:
+
+```clojure
+(ns your-ns.a-test
+  (:require [onyx.kafka.embedded-server :as ke]
+            [com.stuartsierra.component :as component]))
+
+(def kafka-server
+  (component/start
+    (ke/map->EmbeddedKafka {:hostname "127.0.0.1"
+                            :port 9092
+                            :broker-id 0
+			    :num-partitions 1
+                            :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
+                            :zookeeper-addr "127.0.0.1:2188"})))
+
+
+;; perform a test
+
+(component/stop kafka-server)
+
+```
+
 #### Contributing
 
 Pull requests into the master branch are welcomed.
