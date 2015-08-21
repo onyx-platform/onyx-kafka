@@ -4,6 +4,7 @@
             [onyx.kafka.embedded-server :as ke]
             [com.stuartsierra.component :as component]
             [onyx.plugin.kafka]
+            [onyx.kafka.utils :as util]
             [clj-kafka.consumer.zk :as zk]
             [clj-kafka.core :as k]
             [onyx.api]
@@ -29,8 +30,8 @@
 (def env (onyx.api/start-env env-config))
 
 (def kafka-server
-  (component/start 
-    (ke/map->EmbeddedKafka {:hostname "127.0.0.1" 
+  (component/start
+    (ke/map->EmbeddedKafka {:hostname "127.0.0.1"
                             :port 9092
                             :broker-id 0
                             :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
@@ -100,15 +101,11 @@
  {:catalog catalog :workflow workflow :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def config
-  {"zookeeper.connect" "127.0.0.1:2188"
-   "group.id" "onyx-test-consumer"
-   "auto.offset.reset" "smallest"
-   "auto.commit.enable" "false"})
-
-(k/with-resource [c (zk/consumer config)]
-  zk/shutdown
-  (fact (take 4 (map (fn [v] (read-string (String. (:value v) "UTF-8"))) (zk/messages c topic)))
+(let [segments (util/take-segments
+                 (:zookeeper/address peer-config)
+                 topic
+                 (fn [v] (read-string (String. v "UTF-8"))) (zk/messages c topic))]
+  (fact segments
         => [{:n 0} {:n 1} {:n 2} :done]))
 
 (doseq [v-peer v-peers]
