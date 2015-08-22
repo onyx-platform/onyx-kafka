@@ -197,6 +197,10 @@
    :kafka/serializer-fn (:serializer-fn pipeline)
    :kafka/producer (:producer pipeline)})
 
+(defn close-write-resources
+  [event lifecycle]
+  (.close (:kafka/producer event)))
+
 (defrecord KafkaWriteMessages [config topic producer serializer-fn]
   p-ext/Pipeline
   (read-batch
@@ -207,7 +211,15 @@
     [_ {:keys [onyx.core/results]}]
     (let [messages (mapcat :leaves (:tree results))]
       (doseq [m (map :message messages)]
-        (kp/send-message producer (kp/message topic (serializer-fn m)))))
+        (let [k-message (:message m)
+              k-key (:key m)]
+          (assert k-message
+                  "Messages must be supplied in a map in form {:message :somevalue}, or {:message :somevalue :key :somekey}")
+          (if k-key
+            (kp/send-message producer (kp/message topic
+                                                  (serializer-fn k-key)
+                                                  (serializer-fn k-message)))
+            (kp/send-message producer (kp/message topic (serializer-fn k-message)))))))
     {})
 
   (seal-resource
@@ -229,4 +241,5 @@
    :lifecycle/after-task-stop close-read-messages})
 
 (def write-messages-calls
-  {:lifecycle/before-task-start inject-write-messages})
+  {:lifecycle/before-task-start inject-write-messages
+   :lifecycle/after-task-stop close-write-resources})

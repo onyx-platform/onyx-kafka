@@ -21,8 +21,8 @@
       (.startup server)
       (assoc component :server server)))
   (component/stop [{:keys [server] :as component}]
-    (.shutdown server)
-    (.awaitShutdown server)
+    (.shutdown ^KafkaServer server)
+    (.awaitShutdown ^KafkaServer server)
     (assoc component :server nil)))
 
 

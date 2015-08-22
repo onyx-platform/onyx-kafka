@@ -8,6 +8,7 @@
             [clj-kafka.consumer.zk :as zk]
             [clj-kafka.core :as k]
             [onyx.api]
+            [taoensso.timbre :as log :refer [fatal info]]
             [midje.sweet :refer :all]))
 
 (def id (java.util.UUID/randomUUID))
@@ -75,9 +76,11 @@
 
 (def in-chan (chan 1000))
 
-(>!! in-chan {:n 0})
-(>!! in-chan {:n 1})
-(>!! in-chan {:n 2})
+(>!! in-chan {:key 1
+              :message {:n 0}})
+(>!! in-chan {:message {:n 1}})
+(>!! in-chan {:key "tarein"
+              :message {:n 2}})
 (>!! in-chan :done)
 
 (defn inject-in-ch [event lifecycle]
