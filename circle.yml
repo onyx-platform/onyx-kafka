@@ -1,6 +1,5 @@
 dependencies:
   override:
-    - lein deps
     - lein voom build-deps
 
 test:
