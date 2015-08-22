@@ -10,5 +10,6 @@
                  [cheshire "5.4.0"]
                  [zookeeper-clj "0.9.1" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]]
   :profiles {:dev {:dependencies [[midje "1.7.0" :exclusions [commons-codec]]]
-                   :plugins [[lein-midje "3.1.3"]]}
+                   :plugins [[lein-midje "3.1.3"]
+                             [lein-voom "0.1.0-20150822_000839-g763d315"]]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}})
