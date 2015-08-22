@@ -1,3 +1,7 @@
+dependencies:
+  override:
+    - lein voom build-deps
+
 test:
   override:
     - lein with-profile dev,circle-ci midje:

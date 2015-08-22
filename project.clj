@@ -12,5 +12,3 @@
   :profiles {:dev {:dependencies [[midje "1.7.0" :exclusions [commons-codec]]]
                    :plugins [[lein-midje "3.1.3"]]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}})
-
-
