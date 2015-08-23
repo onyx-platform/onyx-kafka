@@ -78,6 +78,9 @@ Lifecycle entry:
  :lifecycle/calls :onyx.plugin.kafka/write-messages-calls}
 ```
 
+Segments supplied to a write-messages task should be in in the following form:
+`{:message message-body}` or `{:message message-body :key message-key}`.
+
 #### Attributes
 
 |key                         | type      | default | description
