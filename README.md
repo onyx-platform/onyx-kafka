@@ -122,7 +122,9 @@ topic, this will hang forever as there is no timeout.
 
 #### Embedded Kafka Server
 
-An embedded Kafka server is included for use in test cases where jobs output to kafka output tasks.
+An embedded Kafka server is included for use in test cases where jobs output to
+kafka output tasks. Note, stopping the server will *not* perform a [graceful shutdown](http://kafka.apache.org/documentation.html#basic_ops_restarting) -
+please do not use this embedded server for anything other than tests.
 
 This can be used like so:
 
