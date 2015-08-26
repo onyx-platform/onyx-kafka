@@ -1,5 +1,6 @@
 (ns onyx.kafka.utils
   (:require [clj-kafka.consumer.zk :as zkconsumer]
+            [taoensso.timbre :refer [info] :as timbre]
             [clj-kafka.core :as zkcore]))
 
 (defn take-segments

@@ -2,24 +2,28 @@
   (:require [clojure.core.async :refer [chan >!! <!!]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [com.stuartsierra.component :as component]
+            [taoensso.timbre :refer [info error] :as timbre]
             [onyx.plugin.kafka]
             [clj-kafka.producer :as kp]
+            [clj-kafka.admin :as kadmin]
             [onyx.kafka.embedded-server :as ke]
             [onyx.api]
             [midje.sweet :refer :all]))
 
 (def id (java.util.UUID/randomUUID))
 
+(def zk-addr "127.0.0.1:2188")
+
 (def env-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address zk-addr
    :zookeeper/server? true
    :zookeeper.server/port 2188
    :onyx/id id})
 
 (def peer-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address zk-addr
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.messaging/impl :netty
+   :onyx.messaging/impl :core.async
    :onyx.messaging/peer-port-range [40200 40400]
    :onyx.messaging/peer-ports [40199]
    :onyx.messaging/bind-addr "localhost"
@@ -33,11 +37,17 @@
                             :port 9092
                             :broker-id 0
                             :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
-                            :zookeeper-addr "127.0.0.1:2188"})))
+                            :zookeeper-addr zk-addr})))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
 (def topic (str "onyx-test-" (java.util.UUID/randomUUID)))
+
+
+(with-open [zk (kadmin/zk-client zk-addr)]
+  (kadmin/create-topic zk topic
+                      {:partitions 2}))
+
 
 (def producer
   (kp/producer
@@ -48,7 +58,17 @@
 (kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 1}))))
 (kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 2}))))
 (kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 3}))))
-(kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
+
+
+(def producer2
+  (kp/producer
+   {"metadata.broker.list" "127.0.0.1:9092"
+    "serializer.class" "kafka.serializer.DefaultEncoder"
+    "partitioner.class" "kafka.producer.DefaultPartitioner"}))
+
+(kp/send-message producer2 (kp/message topic (.getBytes (pr-str {:n 4}))))
+(kp/send-message producer2 (kp/message topic (.getBytes (pr-str {:n 5}))))
+(kp/send-message producer2 (kp/message topic (.getBytes (pr-str {:n 6}))))
 
 (defn deserialize-message [bytes]
   (read-string (String. bytes "UTF-8")))
@@ -63,17 +83,17 @@
     :onyx/type :input
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/partition "0"
     :kafka/group-id "onyx-consumer"
     :kafka/fetch-size 307200
     :kafka/chan-capacity 1000
-    :kafka/zookeeper "127.0.0.1:2188"
+    :kafka/zookeeper zk-addr
     :kafka/offset-reset :smallest
     :kafka/force-reset? true
     :kafka/empty-read-back-off 500
     :kafka/commit-interval 500
     :kafka/deserializer-fn :onyx.plugin.input-test/deserialize-message
-    :onyx/max-peers 1
+    :onyx/min-peers 2
+    :onyx/max-peers 2
     :onyx/batch-size 100
     :onyx/doc "Reads messages from a Kafka topic"}
 
@@ -105,7 +125,7 @@
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
-(def v-peers (onyx.api/start-peers 3 peer-group))
+(def v-peers (onyx.api/start-peers 4 peer-group))
 
 (onyx.api/submit-job
  peer-config
@@ -113,9 +133,17 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(def results (doall (map (fn [_] (<!! out-chan)) (range 4))))
+(Thread/sleep 10000)
 
-(fact results => [{:n 1} {:n 2} {:n 3} :done])
+(kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
+
+(def results (doall (map (fn [_] (<!! out-chan)) (range 7))))
+
+(fact (sort-by :n (butlast results)) 
+      => [{:n 1} {:n 2} {:n 3} 
+          {:n 4} {:n 5} {:n 6}])
+
+(fact (last results) => :done)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
