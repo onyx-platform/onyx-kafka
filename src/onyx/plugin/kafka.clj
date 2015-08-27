@@ -128,7 +128,8 @@
 
 (defn check-num-peers-equals-partitions [{:keys [onyx/min-peers onyx/max-peers] :as task-map} 
                                          n-partitions]
-  (when-not (= n-partitions min-peers max-peers)
+  (when-not (or (= n-partitions min-peers max-peers)
+                (= 1 n-partitions max-peers))
     (let [e (ex-info ":onyx/min-peers must equal :onyx/max-peers and the number of kafka partitions" 
                      {:n-partitions n-partitions 
                       :min-peers min-peers
