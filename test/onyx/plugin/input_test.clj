@@ -133,6 +133,7 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
+;; remove me after learning how to handle the sentinel
 (Thread/sleep 10000)
 
 (kp/send-message producer (kp/message topic (.getBytes (pr-str :done))))
