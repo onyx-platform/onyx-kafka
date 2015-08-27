@@ -69,7 +69,6 @@
     :onyx/type :input
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/partition "0"
     :kafka/group-id "onyx-consumer"
     :kafka/fetch-size 307200
     :kafka/chan-capacity 1000
