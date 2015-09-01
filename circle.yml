@@ -14,6 +14,10 @@ machine:
 
 notify:
   webhooks:
-    # A list of hook hashes, containing the url field
-    # gitter hook
     - url: https://webhooks.gitter.im/e/7f6cadb429def50c94a2
+
+deployment:
+  update-projects:
+    branch: master
+    commands:
+      - lein deploy

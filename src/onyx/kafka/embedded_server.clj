@@ -1,5 +1,6 @@
 (ns onyx.kafka.embedded-server
-  (:require [com.stuartsierra.component :as component])
+  (:require [com.stuartsierra.component :as component]
+            [taoensso.timbre :refer [info error] :as timbre])
   (:import [kafka.utils SystemTime$]
            [kafka.server KafkaConfig KafkaServer]
            [java.util Properties]))
@@ -15,6 +16,7 @@
                        (.setProperty "port" (str port))
                        (.setProperty "log.dir" (or log-dir
                                                    (str "/tmp/kafka-log-" (java.util.UUID/randomUUID))))
+                       (.setProperty "controlled.shutdown.enable" "false")
                        (.setProperty "zookeeper.connect" zookeeper-addr))
           kafka-config (KafkaConfig. properties)
           server (KafkaServer. kafka-config SystemTime$/MODULE$)]
