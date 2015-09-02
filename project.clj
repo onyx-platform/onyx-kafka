@@ -8,7 +8,7 @@
                               :password :env}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.7.3-20150902_134205-g8bdc527"]
+                 [org.onyxplatform/onyx "0.7.3-20150902_154017-g4f6f102"]
                  [clj-kafka "0.3.2" :exclusions [org.apache.zookeeper/zookeeper zookeeper-clj]]
                  [com.stuartsierra/component "0.2.3"]
                  [cheshire "5.5.0"]
