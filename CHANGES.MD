@@ -1,4 +1,4 @@
-# 0.7.2.2
+# 0.7.2.3
 Support auto-assigned partitions.
 
 # 0.7.2.1
