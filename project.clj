@@ -14,5 +14,6 @@
                  [cheshire "5.5.0"]
                  [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]]
   :profiles {:dev {:dependencies [[midje "1.7.0"]]
-                   :plugins [[lein-midje "3.1.3"]]}
+                   :plugins [[lein-midje "3.1.3"]
+                             [lein-pprint "1.1.1"]]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}})
