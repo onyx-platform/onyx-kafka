@@ -20,7 +20,16 @@ In your peer boot-up namespace:
 
 ##### read-messages
 
-Reads segments from one Kafka topic's partition.
+Reads segments from a Kafka topic. Peers will automatically be assigned to each
+of the topics partitions, unless `:kafka/partition` is supplied in which case
+only one partition will be read from. `:onyx/min-peers` and `:onyx/max-peers`
+must be used to fix the number of the peers for the task to the number of
+partitions read by the task.
+
+NOTE: The `:done` sentinel (i.e. batch processing) is not supported if more
+than one partition is auto-assigned i.e. the topic has more than one partition
+and `:kafka/partition` is not fixed. An exception will be thrown if a `:done`
+is read under this circumstance.
 
 Catalog entry:
 
@@ -30,7 +39,6 @@ Catalog entry:
  :onyx/type :input
  :onyx/medium :kafka
  :kafka/topic "my topic"
- :kafka/partition "0"
  :kafka/group-id "onyx-consumer"
  :kafka/fetch-size 307200
  :kafka/chan-capacity 1000
@@ -40,7 +48,8 @@ Catalog entry:
  :kafka/empty-read-back-off 500
  :kafka/commit-interval 500
  :kafka/deserializer-fn :my.ns/deserializer-fn
- :onyx/max-peers 1
+ :onyx/min-peers <<NUMBER-OF-PARTITIONS>>
+ :onyx/max-peers <<NUMBER-OF-PARTITIONS>>
  :onyx/batch-size 100
  :onyx/doc "Reads messages from a Kafka topic"}
 ```
@@ -51,6 +60,22 @@ Lifecycle entry:
 {:lifecycle/task :read-messages
  :lifecycle/calls :onyx.plugin.kafka/read-messages-calls}
 ```
+
+###### Attributes
+
+|key                         | type      | default | description
+|----------------------------|-----------|---------|------------
+|`:kafka/topic`              | `string`  |         | The topic name to connect to
+|`:kafka/partition`          | `string`  |         | Optional: partition to read from if auto-assignment is not used
+|`:kafka/group-id`           | `string`  |         | The consumer identity to store in ZooKeeper
+|`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
+|`:kafka/offset-reset`       | `keyword` |         | Offset bound to seek to when not found - `:smallest` or `:largest`
+|`:kafka/force-reset?`       | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the last acknowledged messsage if it exists
+|`:kafka/chan-capacity`      | `integer` |`1000`   | The buffer size of the Kafka reading channel
+|`:kafka/fetch-size`         | `integer` |`307200` | The size in bytes to request from ZooKeeper per fetch request
+|`:kafka/empty-read-back-off`| `integer` |`500`    | The amount of time to back off between reads when nothing was fetched from a consumer
+|`:kafka/commit-interval`    | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
+|`:kafka/deserializer-fn`    | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
 
 ##### write-messages
 
@@ -81,22 +106,14 @@ Lifecycle entry:
 Segments supplied to a write-messages task should be in in the following form:
 `{:message message-body}` or `{:message message-body :key message-key}`.
 
-#### Attributes
+###### Attributes
 
 |key                         | type      | default | description
 |----------------------------|-----------|---------|------------
 |`:kafka/topic`              | `string`  |         | The topic name to connect to
-|`:kafka/partition`          | `string`  |         | The partition to read from
-|`:kafka/group-id`           | `string`  |         | The consumer identity to store in ZooKeeper
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
-|`:kafka/offset-reset`       | `keyword` |         | Offset bound to seek to when not found - `:smallest` or `:largest`
-|`:kafka/force-reset?`       | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the last acknowledged messsage if it exists
-|`:kafka/chan-capacity`      | `integer` |`1000`   | The buffer size of the Kafka reading channel
-|`:kafka/fetch-size`         | `integer` |`307200` | The size in bytes to request from ZooKeeper per fetch request
-|`:kafka/empty-read-back-off`| `integer` |`500`    | The amount of time to back off between reads when nothing was fetched from a consumer
-|`:kafka/commit-interval`    | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
 |`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
-|`:kafka/deserializer-fn`    | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
+|`:kafka/partitioner-class`  | `string`  |         | Kafka partioner class name
 
 #### Test Utilities
 

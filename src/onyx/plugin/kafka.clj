@@ -21,7 +21,6 @@
    :kafka/empty-read-back-off 500
    :kafka/commit-interval 2000})
 
-
 (defn spin-until-allocated [replica job-id peer-id task-id]
   (loop [partition (get-in @replica [:task-metadata job-id task-id peer-id])] 
     (if partition 
@@ -81,12 +80,14 @@
     (catch Throwable e
       (fatal e))))
 
-(defn reader-loop [m client-id group-id topic partitions task-map 
+(defn reader-loop [m client-id group-id topic static-partition partitions task-map 
                    replica job-id peer-id task-id ch pending-commits]
   (try
     (loop []
       (try
-        (let [kpartition (spin-until-allocated replica job-id peer-id task-id)
+        (let [kpartition (if static-partition
+                           (Integer/parseInt (str static-partition))
+                           (spin-until-allocated replica job-id peer-id task-id)) 
               _ (log/info "Kafka task:" task-id "allocated to partition:" kpartition)
               brokers (get partitions (str kpartition))
               broker (get (id->broker m) (first brokers))
@@ -120,32 +121,28 @@
     (catch InterruptedException e
       (throw e))))
 
-(defn check-outdated-task-map [task-map]
-  (when (:kafka/partition task-map)
-    (throw 
-      (ex-info ":kafka/partition is no longer necessary when using the kafka input task. Partitions are now automatically assigned." 
-               task-map))))
-
-(defn check-num-peers-equals-partitions [{:keys [onyx/min-peers onyx/max-peers] :as task-map} 
+(defn check-num-peers-equals-partitions [{:keys [onyx/min-peers onyx/max-peers
+                                                 kafka/partition] :as task-map} 
                                          n-partitions]
-  (when-not (or (= n-partitions min-peers max-peers)
-                (= 1 n-partitions max-peers))
-    (let [e (ex-info ":onyx/min-peers must equal :onyx/max-peers and the number of kafka partitions" 
-                     {:n-partitions n-partitions 
-                      :min-peers min-peers
-                      :max-peers max-peers
-                      :task-map task-map})] 
-      (log/error e)
-      (throw e))))
+  (let [fixed-partition? (and partition (= 1 max-peers))
+        all-partitions-covered? (= n-partitions min-peers max-peers)
+        one-partition? (= 1 n-partitions max-peers)] 
+    (when-not (or fixed-partition? all-partitions-covered? one-partition?)
+      (let [e (ex-info ":onyx/min-peers must equal :onyx/max-peers and the number of kafka partitions" 
+                       {:n-partitions n-partitions 
+                        :min-peers min-peers
+                        :max-peers max-peers
+                        :task-map task-map})] 
+        (log/error e)
+        (throw e)))))
 
 (defn start-kafka-consumer
   [{:keys [onyx.core/task-map onyx.core/pipeline] :as event} lifecycle]
-  (check-outdated-task-map task-map)
   (let [{:keys [kafka/topic kafka/partition kafka/group-id]} task-map
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         client-id "onyx"
         m {"zookeeper.connect" (:kafka/zookeeper task-map)}
-        partitions (kzk/partitions m topic)
+        partitions (:partitions pipeline)
         n-partitions (count partitions)
         _ (check-num-peers-equals-partitions task-map n-partitions)
         ch (:read-ch pipeline)
@@ -154,22 +151,23 @@
         job-id (:onyx.core/job-id event)
         peer-id (:onyx.core/id event)
         task-id (:onyx.core/task-id event)
-        reader-fut (future (reader-loop m client-id group-id topic partitions task-map 
+        reader-fut (future (reader-loop m client-id group-id topic partition partitions task-map 
                                         (:onyx.core/replica event) job-id peer-id task-id
                                         ch pending-commits))
-        _ (>!! (:onyx.core/outbox-ch event)
-               {:fn :allocate-kafka-partition
-                :args {:n-partitions n-partitions
-                       :job-id job-id
-                       :task-id task-id 
-                       :peer-id peer-id}})]
+        _ (when-not partition 
+            (>!! (:onyx.core/outbox-ch event)
+                 {:fn :allocate-kafka-partition
+                  :args {:n-partitions n-partitions
+                         :job-id job-id
+                         :task-id task-id 
+                         :peer-id peer-id}}))]
     {:kafka/read-ch ch
      :kafka/reader-future reader-fut
      :kafka/pending-messages pending-messages
      :kafka/pending-commits pending-commits}))
 
-(defrecord KafkaReadMessages [max-pending batch-size batch-timeout pending-messages
-                              pending-commits drained? read-ch]
+(defrecord KafkaReadMessages [max-pending batch-size batch-timeout partitions done-unsupported? 
+                              pending-messages pending-commits drained? read-ch]
   p-ext/Pipeline
   (write-batch
     [this event]
@@ -191,7 +189,10 @@
       (when (and (= 1 (count @pending-messages))
                  (= (count batch) 1)
                  (= (:message (first batch)) :done))
-        (reset! drained? true))
+        (if done-unsupported? 
+          (throw (UnsupportedOperationException. ":done is not supported for auto assigned kafka partitions. 
+                                                 (:kafka/partition must be supplied)"))
+          (reset! drained? true)))
       {:onyx.core/batch batch}))
 
   p-ext/PipelineInput
@@ -222,11 +223,15 @@
         batch-size (:onyx/batch-size catalog-entry)
         batch-timeout (arg-or-default :onyx/batch-timeout catalog-entry)
         chan-capacity (or (:kafka/chan-capacity catalog-entry) (:kafka/chan-capacity defaults))
+        m {"zookeeper.connect" (:kafka/zookeeper catalog-entry)}
+        partitions (kzk/partitions m (:kafka/topic catalog-entry))
+        done-unsupported? (and (> (count partitions) 1) 
+                               (not (:kafka/partition catalog-entry)))
         ch (chan chan-capacity)
         pending-messages (atom {})
         pending-commits (atom (sorted-set))
         drained? (atom false)]
-    (->KafkaReadMessages max-pending batch-size batch-timeout
+    (->KafkaReadMessages max-pending batch-size batch-timeout partitions done-unsupported?
                          pending-messages pending-commits drained? ch)))
 
 (defn close-read-messages
