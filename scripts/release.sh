@@ -20,3 +20,10 @@ git push origin master
 git checkout $release_branch
 git merge master
 git push origin $release_branch
+
+# Prepare next release cycle.
+git checkout master
+lein set-version
+git add .
+git commit -m "Prepare for next release cycle."
+git push origin master

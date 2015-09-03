@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-kafka "0.7.3-beta4"
+(defproject org.onyxplatform/onyx-kafka "0.7.2.2"
   :description "Onyx plugin for Kafka"
   :url "https://github.com/MichaelDrogalis/onyx-kafka"
   :license {:name "Eclipse Public License"
@@ -13,7 +13,11 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.7.3-20150902_184529-ge83d8e1"]
+<<<<<<< HEAD
+                 [org.onyxplatform/onyx "0.7.3-beta6"]
+=======
+                 [org.onyxplatform/onyx "0.7.2"]
+>>>>>>> master
                  [clj-kafka "0.3.2" :exclusions [org.apache.zookeeper/zookeeper zookeeper-clj]]
                  [com.stuartsierra/component "0.2.3"]
                  [cheshire "5.5.0"]
