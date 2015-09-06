@@ -79,7 +79,7 @@ Lifecycle entry:
 
 ##### write-messages
 
-Writes segments to a Kafka topic.
+Writes segments to a Kafka topic using the Kafka "new" producer.
 
 Catalog entry:
 
