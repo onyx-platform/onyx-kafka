@@ -5,6 +5,7 @@
             [com.stuartsierra.component :as component]
             [onyx.plugin.kafka]
             [onyx.kafka.utils :as util]
+            [clj-kafka.admin :as kadmin]
             [clj-kafka.consumer.zk :as zk]
             [clj-kafka.core :as k]
             [onyx.api]
@@ -13,14 +14,16 @@
 
 (def id (java.util.UUID/randomUUID))
 
+(def zk-addr "127.0.0.1:2188")
+
 (def env-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address zk-addr
    :zookeeper/server? true
    :zookeeper.server/port 2188
    :onyx/id id})
 
 (def peer-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address zk-addr
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.messaging/impl :netty
    :onyx.messaging/peer-port-range [40200 40400]
@@ -36,11 +39,15 @@
                             :port 9092
                             :broker-id 0
                             :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
-                            :zookeeper-addr "127.0.0.1:2188"})))
+                            :zookeeper-addr zk-addr})))
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
 (def topic (str "onyx-test-" (java.util.UUID/randomUUID)))
+
+(with-open [zk (kadmin/zk-client zk-addr)]
+  (kadmin/create-topic zk topic
+                       {:partitions 3}))
 
 (def workflow
   [[:in :identity]
@@ -68,7 +75,7 @@
     :onyx/type :output
     :onyx/medium :kafka
     :kafka/topic topic
-    :kafka/zookeeper "127.0.0.1:2188"
+    :kafka/zookeeper zk-addr
     :kafka/serializer-fn :onyx.plugin.output-test/serialize-segment
     :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
     :onyx/batch-size 100
@@ -80,6 +87,7 @@
               :message {:n 0}})
 (>!! in-chan {:message {:n 1}})
 (>!! in-chan {:key "tarein"
+              :partition 1
               :message {:n 2}})
 (>!! in-chan :done)
 
@@ -104,12 +112,26 @@
  {:catalog catalog :workflow workflow :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(let [segments (util/take-segments
+(let [messages (util/take-until-done
                  (:zookeeper/address peer-config)
                  topic
                  (fn [v] (read-string (String. v "UTF-8"))))]
-  (fact segments
-        => [{:n 0} {:n 1} {:n 2} :done]))
+  (fact (->> messages
+             (sort-by (comp :n :value))
+             (map (fn [msg] 
+                    (select-keys (if-not (= "tarein" (:key msg)) 
+                                   (assoc msg :partition nil)
+                                   msg) 
+                                 [:key :value :partition]))))
+        => [{:key 1
+             :partition nil
+             :value {:n 0}} 
+            {:key nil
+             :partition nil
+             :value {:n 1}} 
+            {:key "tarein" 
+             :partition 1
+             :value {:n 2}}]))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
