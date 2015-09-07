@@ -202,7 +202,7 @@
 
   (ack-segment [_ _ segment-id]
     (when-let [offset (:offset (get @pending-messages segment-id))]
-      (clojure.pprint/pprint ["ACK" (get @pending-messages segment-id)])
+      ;; (clojure.pprint/pprint ["ACK" (get @pending-messages segment-id)])
       (swap! pending-commits conj offset))
     (swap! pending-messages dissoc segment-id))
 
