@@ -167,6 +167,10 @@
      :kafka/pending-messages pending-messages
      :kafka/pending-commits pending-commits}))
 
+(defn all-done? [messages]
+  (empty? (remove #(= :done (:message %))
+                  messages)))
+
 (defrecord KafkaReadMessages [max-pending batch-size batch-timeout partitions done-unsupported? 
                               pending-messages pending-commits drained? read-ch]
   p-ext/Pipeline
@@ -189,9 +193,10 @@
                        (filter :message)))]
       (doseq [m batch]
         (swap! pending-messages assoc (:id m) m))
-      (when (and (= 1 (count @pending-messages))
-                 (= (count batch) 1)
-                 (= (:message (first batch)) :done))
+      (when (and (all-done? (vals @pending-messages))
+                 (all-done? batch)
+                 (or (not (empty? @pending-messages))
+                     (not (empty? batch))))
         (if done-unsupported? 
           (throw (UnsupportedOperationException. ":done is not supported for auto assigned kafka partitions. 
                                                  (:kafka/partition must be supplied)"))
