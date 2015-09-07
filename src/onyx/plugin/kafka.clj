@@ -110,7 +110,6 @@
                 (let [message ^KafkaMessage (first ms)
                       next-offset ^int (.offset message)
                       dm (deserializer-fn (.value message))]
-                  (clojure.pprint/pprint ["RX" dm])
                   (>!! ch (assoc (t/input (java.util.UUID/randomUUID)
                                           dm)
                                  :offset next-offset))
@@ -202,7 +201,6 @@
 
   (ack-segment [_ _ segment-id]
     (when-let [offset (:offset (get @pending-messages segment-id))]
-      (clojure.pprint/pprint ["ACK" (get @pending-messages segment-id)])
       (swap! pending-commits conj offset))
     (swap! pending-messages dissoc segment-id))
 
