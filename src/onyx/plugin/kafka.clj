@@ -103,13 +103,16 @@
             (loop [ms (kc/messages consumer "onyx" topic kpartition offset fetch-size)
                    head-offset offset]
               (if-not (seq ms)
-                (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
+                (do
                   (Thread/sleep empty-read-back-off)
-                  (recur fetched head-offset))
+                  (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
+                    (recur fetched head-offset)))
                 (let [message ^KafkaMessage (first ms)
-                      next-offset ^int (.offset message)]
+                      next-offset ^int (.offset message)
+                      dm (deserializer-fn (.value message))]
+                  (clojure.pprint/pprint ["RX" dm])
                   (>!! ch (assoc (t/input (java.util.UUID/randomUUID)
-                                          (deserializer-fn (.value message)))
+                                          dm)
                                  :offset next-offset))
                   (recur (rest ms) (inc next-offset)))))
             (finally
@@ -199,6 +202,7 @@
 
   (ack-segment [_ _ segment-id]
     (when-let [offset (:offset (get @pending-messages segment-id))]
+      (clojure.pprint/pprint ["ACK" (get @pending-messages segment-id)])
       (swap! pending-commits conj offset))
     (swap! pending-messages dissoc segment-id))
 
