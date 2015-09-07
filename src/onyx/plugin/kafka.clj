@@ -103,10 +103,9 @@
             (loop [ms (kc/messages consumer "onyx" topic kpartition offset fetch-size)
                    head-offset offset]
               (if-not (seq ms)
-                (do
-                  (Thread/sleep empty-read-back-off)
-                  (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
-                    (recur fetched head-offset)))
+                (let [_ (Thread/sleep empty-read-back-off)
+                      fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
+                  (recur fetched head-offset))
                 (let [message ^KafkaMessage (first ms)
                       next-offset ^int (.offset message)
                       dm (deserializer-fn (.value message))]
@@ -179,13 +178,15 @@
     (let [pending (count (keys @pending-messages))
           max-segments (min (- max-pending pending) batch-size)
           timeout-ch (timeout batch-timeout)
-          batch (->> (range max-segments)
-                     (map (fn [_]
-                            (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
-                              (if (= (:message result) :done)
-                                (t/input (java.util.UUID/randomUUID) :done)
-                                result))))
-                     (filter :message))]
+          batch (if (zero? max-segments) 
+                  (<!! timeout-ch)
+                  (->> (range max-segments)
+                       (map (fn [_]
+                              (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
+                                (if (= (:message result) :done)
+                                  (t/input (java.util.UUID/randomUUID) :done)
+                                  result))))
+                       (filter :message)))]
       (doseq [m batch]
         (swap! pending-messages assoc (:id m) m))
       (when (and (= 1 (count @pending-messages))
