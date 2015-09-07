@@ -108,9 +108,11 @@
                   (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
                     (recur fetched head-offset)))
                 (let [message ^KafkaMessage (first ms)
-                      next-offset ^int (.offset message)]
+                      next-offset ^int (.offset message)
+                      dm (deserializer-fn (.value message))]
+                  (clojure.pprint/pprint ["RX" dm])
                   (>!! ch (assoc (t/input (java.util.UUID/randomUUID)
-                                          (deserializer-fn (.value message)))
+                                          dm)
                                  :offset next-offset))
                   (recur (rest ms) (inc next-offset)))))
             (finally
