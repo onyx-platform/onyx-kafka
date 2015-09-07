@@ -79,7 +79,7 @@ Lifecycle entry:
 
 ##### write-messages
 
-Writes segments to a Kafka topic.
+Writes segments to a Kafka topic using the Kafka "new" producer.
 
 Catalog entry:
 
@@ -91,7 +91,6 @@ Catalog entry:
  :kafka/topic "topic"
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/serializer-fn :my.ns/serializer-fn
- :kafka/partitioner-class "kafka.producer.DefaultPartitioner"
  :onyx/batch-size batch-size
  :onyx/doc "Writes messages to a Kafka topic"}
 ```
@@ -104,7 +103,8 @@ Lifecycle entry:
 ```
 
 Segments supplied to a write-messages task should be in in the following form:
-`{:message message-body}` or `{:message message-body :key message-key}`.
+`{:message message-body}` with optional partition and key values e.g.
+`{:message message-body :key optional-key :partition optional-partition}`.
 
 ###### Attributes
 
@@ -113,7 +113,6 @@ Segments supplied to a write-messages task should be in in the following form:
 |`:kafka/topic`              | `string`  |         | The topic name to connect to
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
 |`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
-|`:kafka/partitioner-class`  | `string`  |         | Kafka partioner class name
 
 #### Test Utilities
 
