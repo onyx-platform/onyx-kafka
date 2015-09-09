@@ -1,6 +1,6 @@
 (ns onyx.plugin.kafka
   (:require [clojure.core.async :refer [chan >!! <!! close! timeout alts!! sliding-buffer]]
-            [clj-kafka.producer :as kp]
+            [clj-kafka.new.producer :as kp]
             [clj-kafka.zk :as kzk]
             [clj-kafka.consumer.simple :as kc]
             [clj-kafka.core :as k]
@@ -103,13 +103,14 @@
             (loop [ms (kc/messages consumer "onyx" topic kpartition offset fetch-size)
                    head-offset offset]
               (if-not (seq ms)
-                (let [fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
-                  (Thread/sleep empty-read-back-off)
+                (let [_ (Thread/sleep empty-read-back-off)
+                      fetched (kc/messages consumer "onyx" topic kpartition head-offset fetch-size)]
                   (recur fetched head-offset))
                 (let [message ^KafkaMessage (first ms)
-                      next-offset ^int (.offset message)]
+                      next-offset ^int (.offset message)
+                      dm (deserializer-fn (.value message))]
                   (>!! ch (assoc (t/input (java.util.UUID/randomUUID)
-                                          (deserializer-fn (.value message)))
+                                          dm)
                                  :offset next-offset))
                   (recur (rest ms) (inc next-offset)))))
             (finally
@@ -166,6 +167,10 @@
      :kafka/pending-messages pending-messages
      :kafka/pending-commits pending-commits}))
 
+(defn all-done? [messages]
+  (empty? (remove #(= :done (:message %))
+                  messages)))
+
 (defrecord KafkaReadMessages [max-pending batch-size batch-timeout partitions done-unsupported? 
                               pending-messages pending-commits drained? read-ch]
   p-ext/Pipeline
@@ -177,18 +182,21 @@
     (let [pending (count (keys @pending-messages))
           max-segments (min (- max-pending pending) batch-size)
           timeout-ch (timeout batch-timeout)
-          batch (->> (range max-segments)
-                     (map (fn [_]
-                            (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
-                              (if (= (:message result) :done)
-                                (t/input (java.util.UUID/randomUUID) :done)
-                                result))))
-                     (filter :message))]
+          batch (if (zero? max-segments) 
+                  (<!! timeout-ch)
+                  (->> (range max-segments)
+                       (map (fn [_]
+                              (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
+                                (if (= (:message result) :done)
+                                  (t/input (java.util.UUID/randomUUID) :done)
+                                  result))))
+                       (filter :message)))]
       (doseq [m batch]
         (swap! pending-messages assoc (:id m) m))
-      (when (and (= 1 (count @pending-messages))
-                 (= (count batch) 1)
-                 (= (:message (first batch)) :done))
+      (when (and (all-done? (vals @pending-messages))
+                 (all-done? batch)
+                 (or (not (empty? @pending-messages))
+                     (not (empty? batch))))
         (if done-unsupported? 
           (throw (UnsupportedOperationException. ":done is not supported for auto assigned kafka partitions. 
                                                  (:kafka/partition must be supplied)"))
@@ -262,25 +270,24 @@
     (let [messages (mapcat :leaves (:tree results))]
       (doseq [m (map :message messages)]
         (let [k-message (:message m)
-              k-key (:key m)]
+              k-key (some-> m :key serializer-fn)
+              p (some-> m :partition int)]
           (assert k-message
-                  "Messages must be supplied in a map in form {:message :somevalue}, or {:message :somevalue :key :somekey}")
-          (if k-key
-            (kp/send-message producer (kp/message topic
-                                                  (serializer-fn k-key)
-                                                  (serializer-fn k-message)))
-            (kp/send-message producer (kp/message topic (serializer-fn k-message)))))))
+                  "Messages must be supplied in a map in form {:message :somevalue}, with optional :key and :partition keys.")
+          (kp/send producer (kp/record topic p k-key (serializer-fn k-message))))))
     {})
 
   (seal-resource
     [_ {:keys [onyx.core/results]}]
-    (kp/send-message producer (kp/message topic (serializer-fn :done)))))
+    (kp/send producer (kp/record topic (serializer-fn :done)))))
 
 (defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
         bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
-        config {"metadata.broker.list" bl
-                "partitioner.class" (:kafka/partitioner-class task-map)}
+        ;; support some additional opts here
+        config {"bootstrap.servers" bl
+                "key.serializer" "org.apache.kafka.common.serialization.ByteArraySerializer"
+                "value.serializer" "org.apache.kafka.common.serialization.ByteArraySerializer"}
         topic (:kafka/topic task-map)
         producer (kp/producer config)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))]

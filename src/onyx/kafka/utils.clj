@@ -3,8 +3,8 @@
             [taoensso.timbre :refer [info] :as timbre]
             [clj-kafka.core :as zkcore]))
 
-(defn take-segments
-  "Reads segments from a topic until a :done is reached."
+(defn take-until-done
+  "Reads from a topic until a :done is reached."
   [zk-addr topic decompress-fn]
   (let [kafka-config {"zookeeper.connect" zk-addr
                       "group.id" "onyx-consumer"
@@ -12,9 +12,18 @@
                       "auto.commit.enable" "false"}]
     (zkcore/with-resource [c (zkconsumer/consumer kafka-config)]
       zkconsumer/shutdown
-      (conj (->> (zkconsumer/messages c topic)
-                 (map :value)
-                 (map decompress-fn)
-                 (take-while (fn [v] (not= :done v)))
-                 vec)
-            :done))))
+      (->> (zkconsumer/messages c topic)
+           (map (fn [msg] (-> msg 
+                              (update :key #(if % 
+                                              (decompress-fn %)))
+                              (update :value decompress-fn))))
+                 (take-while (fn [v] (not= :done (:value v))))
+                 vec))))
+
+
+(defn take-segments
+  "Reads segments from a topic until a :done is reached."
+  [zk-addr topic decompress-fn]
+  (conj (mapv :value 
+              (take-until-done zk-addr topic decompress-fn))
+        :done))
