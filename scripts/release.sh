@@ -7,9 +7,9 @@ set -o xtrace
 
 cd "$(dirname "$0")/.."
 
-current_version=`lein pprint :version`
 new_version=$1
 release_branch=$2
+current_version=`lein pprint :version`
 
 # Update to release version.
 git checkout master
@@ -29,6 +29,5 @@ git push origin $release_branch
 # Prepare next release cycle.
 git checkout master
 lein set-version
-git add .
-git commit -m "Prepare for next release cycle."
+git commit -m "Prepare for next release cycle." project.clj README.md
 git push origin master
