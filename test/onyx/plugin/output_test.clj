@@ -25,8 +25,7 @@
 (def peer-config
   {:zookeeper/address zk-addr
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.messaging/impl :netty
-   :onyx.messaging/peer-port-range [40200 40400]
+   :onyx.messaging/impl :aeron
    :onyx.messaging/peer-ports [40199]
    :onyx.messaging/bind-addr "localhost"
    :onyx/id id})
