@@ -13,7 +13,7 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.7.4-20150910_212438-g95d7a0e"]
+                 [org.onyxplatform/onyx "0.7.4-20150911_234145-gb1ffdbb"]
                  [clj-kafka "0.3.2" :exclusions [org.apache.zookeeper/zookeeper zookeeper-clj]]
                  [com.stuartsierra/component "0.2.3"]
                  [cheshire "5.5.0"]
