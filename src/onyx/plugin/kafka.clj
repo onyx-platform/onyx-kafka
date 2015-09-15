@@ -274,12 +274,12 @@
               p (some-> m :partition int)]
           (assert k-message
                   "Messages must be supplied in a map in form {:message :somevalue}, with optional :key and :partition keys.")
-          (kp/send producer (kp/record topic p k-key (serializer-fn k-message))))))
+          @(kp/send producer (kp/record topic p k-key (serializer-fn k-message))))))
     {})
 
   (seal-resource
     [_ {:keys [onyx.core/results]}]
-    (kp/send producer (kp/record topic (serializer-fn :done)))))
+    @(kp/send producer (kp/record topic (serializer-fn :done)))))
 
 (defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
