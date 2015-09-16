@@ -11,7 +11,6 @@
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.function :as function]
             [onyx.peer.operation :refer [kw->fn]]
-            [onyx.plugin.kafka-log]
             [taoensso.timbre :as log :refer [fatal info]])
   (:import [clj_kafka.core KafkaMessage]))
 
@@ -21,13 +20,8 @@
    :kafka/empty-read-back-off 500
    :kafka/commit-interval 2000})
 
-(defn spin-until-allocated [replica job-id peer-id task-id]
-  (loop [partition (get-in @replica [:task-metadata job-id task-id peer-id])] 
-    (if partition 
-      partition
-      (do
-        (Thread/sleep 500)
-        (recur (get-in @replica [:task-metadata job-id task-id peer-id]))))))
+(defn log-id [replica-val job-id peer-id task-id]
+  (get-in replica-val [:task-slot-ids job-id task-id peer-id]))
 
 ;; kafka operations
 
@@ -87,7 +81,7 @@
       (try
         (let [kpartition (if static-partition
                            (Integer/parseInt (str static-partition))
-                           (spin-until-allocated replica job-id peer-id task-id)) 
+                           (log-id @replica job-id peer-id task-id)) 
               _ (log/info "Kafka task:" task-id "allocated to partition:" kpartition)
               brokers (get partitions (str kpartition))
               broker (get (id->broker m) (first brokers))
@@ -154,14 +148,7 @@
         task-id (:onyx.core/task-id event)
         reader-fut (future (reader-loop m client-id group-id topic partition partitions task-map 
                                         (:onyx.core/replica event) job-id peer-id task-id
-                                        ch pending-commits))
-        _ (when-not partition 
-            (>!! (:onyx.core/outbox-ch event)
-                 {:fn :allocate-kafka-partition
-                  :args {:n-partitions n-partitions
-                         :job-id job-id
-                         :task-id task-id 
-                         :peer-id peer-id}}))]
+                                        ch pending-commits))]
     {:kafka/read-ch ch
      :kafka/reader-future reader-fut
      :kafka/pending-messages pending-messages
