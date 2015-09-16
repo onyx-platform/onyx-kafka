@@ -267,14 +267,17 @@
 
   (write-batch
     [_ {:keys [onyx.core/results]}]
-    (let [messages (mapcat :leaves (:tree results))]
-      (doseq [m (map :message messages)]
-        (let [k-message (:message m)
-              k-key (some-> m :key serializer-fn)
-              p (some-> m :partition int)]
-          (assert k-message
-                  "Messages must be supplied in a map in form {:message :somevalue}, with optional :key and :partition keys.")
-          @(kp/send producer (kp/record topic p k-key (serializer-fn k-message))))))
+    (let [messages (mapcat :leaves (:tree results))
+          send-futs (doall 
+                      (map (fn [m]
+                             (let [k-message (:message m)
+                                   k-key (some-> m :key serializer-fn)
+                                   p (some-> m :partition int)]
+                               (assert k-message
+                                       "Messages must be supplied in a map in form {:message :somevalue}, with optional :key and :partition keys.")
+                               (kp/send producer (kp/record topic p k-key (serializer-fn k-message)))))
+                           (map :message messages)))]
+      (doall (map deref send-futs)))
     {})
 
   (seal-resource
