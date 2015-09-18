@@ -120,8 +120,6 @@
 
 (def results (doall (map (fn [_] (<!! out-chan)) (range 3))))
 
-(println "First results out " results)
-
 (onyx.api/kill-job peer-config job-id)
 (onyx.api/await-job-completion peer-config job-id)
 
