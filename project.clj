@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-kafka "0.7.4-SNAPSHOT"
+(defproject org.onyxplatform/onyx-kafka "0.7.5-SNAPSHOT"
   :description "Onyx plugin for Kafka"
   :url "https://github.com/MichaelDrogalis/onyx-kafka"
   :license {:name "Eclipse Public License"
@@ -21,5 +21,6 @@
   :profiles {:dev {:dependencies [[midje "1.7.0"]]
                    :plugins [[lein-midje "3.1.3"]
                              [lein-set-version "0.4.1"]
+                             [lein-update-dependency "0.1.2"]
                              [lein-pprint "1.1.1"]]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}})
