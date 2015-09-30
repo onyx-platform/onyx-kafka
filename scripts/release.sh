@@ -9,13 +9,13 @@ cd "$(dirname "$0")/.."
 
 new_version=$1
 release_branch=$2
-current_version=`lein pprint :version`
+current_version=`lein pprint :version | sed s/\"//g`
 
 # Update to release version.
 git checkout master
 lein set-version $new_version
 lein update-dependency org.onyxplatform/onyx $new_version
-sed -i '' "s/$current_version/\"$new_version\"/g" README.md
+sed -i '' 's/$current_version/"$new_version"/g' README.md
 
 git commit -am "Release version $new_version."
 git tag $new_version
