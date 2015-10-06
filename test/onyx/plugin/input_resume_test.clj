@@ -108,7 +108,7 @@
   {:lifecycle/before-batch 
    (fn [event lifecycle]
      ; give the peer a bit of time to write the chunks out and ack the batches,
-     ; since we want to ensure that the batches aren't re-read on restart
+     ; since we want to ensure that the batches aren't re-read on restart for ease of testing
      (Thread/sleep 7000)
      (when (= (swap! batch-num inc) 2)
        (throw (ex-info "Restartable" {:restartable? true}))))})
