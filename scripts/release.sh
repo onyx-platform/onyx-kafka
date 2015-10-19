@@ -15,9 +15,10 @@ current_version=`lein pprint :version | sed s/\"//g`
 git checkout master
 lein set-version $new_version
 lein update-dependency org.onyxplatform/onyx $new_version
-sed -i '' 's/$current_version/"$new_version"/g' README.md
+sed -i.bak 's/$current_version/"$new_version"/g' README.md
+git add README.md project.clj
 
-git commit -am "Release version $new_version."
+git commit -m "Release version $new_version."
 git tag $new_version
 git push origin $new_version
 git push origin master
