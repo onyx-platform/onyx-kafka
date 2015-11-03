@@ -24,7 +24,7 @@
   {:zookeeper/address zk-addr
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.messaging/impl :aeron
-   :onyx.messaging/peer-ports [40199]
+   :onyx.messaging/peer-port 40199
    :onyx.messaging/bind-addr "localhost"
    :onyx/id id})
 
