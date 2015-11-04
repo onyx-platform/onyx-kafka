@@ -90,6 +90,7 @@
     :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
+    :onyx/max-peers 1
     :onyx/batch-size 100
     :onyx/doc "Writes segments to a core.async channel"}])
 
