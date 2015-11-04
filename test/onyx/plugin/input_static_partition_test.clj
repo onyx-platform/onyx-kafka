@@ -24,7 +24,7 @@
   {:zookeeper/address zk-addr
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.messaging/impl :aeron
-   :onyx.messaging/peer-ports [40199]
+   :onyx.messaging/peer-port 40199
    :onyx.messaging/bind-addr "localhost"
    :onyx/id id})
 
@@ -90,6 +90,7 @@
     :onyx/plugin :onyx.plugin.core-async/output
     :onyx/type :output
     :onyx/medium :core.async
+    :onyx/max-peers 1
     :onyx/batch-size 100
     :onyx/doc "Writes segments to a core.async channel"}])
 
