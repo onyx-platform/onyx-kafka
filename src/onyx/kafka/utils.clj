@@ -5,22 +5,23 @@
 
 (defn take-until-done
   "Reads from a topic until a :done is reached."
-  [zk-addr topic decompress-fn opts]
-  (let [fetch-size (get opts :kafka/fetch-size 307200)
-        kafka-config {"zookeeper.connect" zk-addr
-                      "group.id" "onyx-consumer"
-                      "auto.offset.reset" "smallest"
-                      "auto.commit.enable" "false"
-                      "fetch.message.max.bytes" (str fetch-size)}]
-    (zkcore/with-resource [c (zkconsumer/consumer kafka-config)]
-      zkconsumer/shutdown
-      (->> (zkconsumer/messages c topic)
-           (map (fn [msg] (-> msg 
-                              (update :key #(if % 
-                                              (decompress-fn %)))
-                              (update :value decompress-fn))))
-           (take-while (fn [v] (not= :done (:value v))))
-           vec))))
+  ([zk-addr topic decompress-fn] (take-until-done zk-addr topic decompress-fn {}))
+  ([zk-addr topic decompress-fn opts]
+   (let [fetch-size (get opts :kafka/fetch-size 307200)
+         kafka-config {"zookeeper.connect" zk-addr
+                       "group.id" "onyx-consumer"
+                       "auto.offset.reset" "smallest"
+                       "auto.commit.enable" "false"
+                       "fetch.message.max.bytes" (str fetch-size)}]
+     (zkcore/with-resource [c (zkconsumer/consumer kafka-config)]
+       zkconsumer/shutdown
+       (->> (zkconsumer/messages c topic)
+            (map (fn [msg] (-> msg 
+                               (update :key #(if % 
+                                               (decompress-fn %)))
+                               (update :value decompress-fn))))
+            (take-while (fn [v] (not= :done (:value v))))
+            vec)))))
 
 
 (defn take-segments
