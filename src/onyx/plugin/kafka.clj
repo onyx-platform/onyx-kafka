@@ -16,6 +16,7 @@
 
 (def defaults
   {:kafka/fetch-size 307200
+   :kafka/request-size 307200
    :kafka/chan-capacity 1000
    :kafka/empty-read-back-off 500
    :kafka/commit-interval 2000})
@@ -275,9 +276,11 @@
   (let [task-map (:onyx.core/task-map pipeline-data)
         bl (kzk/broker-list (kzk/brokers {"zookeeper.connect" (:kafka/zookeeper task-map)}))
         ;; support some additional opts here
+        request-size (or (get task-map :kafka/request-size) (get defaults :kafka/request-size))
         config {"bootstrap.servers" bl
                 "key.serializer" "org.apache.kafka.common.serialization.ByteArraySerializer"
-                "value.serializer" "org.apache.kafka.common.serialization.ByteArraySerializer"}
+                "value.serializer" "org.apache.kafka.common.serialization.ByteArraySerializer"
+                "max.request.size" (str request-size)}
         topic (:kafka/topic task-map)
         producer (kp/producer config)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))]
