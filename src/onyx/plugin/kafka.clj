@@ -183,6 +183,7 @@
         (swap! pending-messages assoc (:id m) m))
       (when (and (all-done? (vals @pending-messages))
                  (all-done? batch)
+		 (zero? (count (.buf read-ch)))
                  (or (not (empty? @pending-messages))
                      (not (empty? batch))))
         (if done-unsupported? 
@@ -201,9 +202,9 @@
   (retry-segment
     [_ _ segment-id]
     (when-let [msg (get @pending-messages segment-id)]
-      (swap! pending-messages dissoc segment-id)
       (>!! read-ch (t/input (java.util.UUID/randomUUID)
-                            (:message msg)))))
+                            (:message msg)))
+      (swap! pending-messages dissoc segment-id)))
 
   (pending?
     [_ _ segment-id]
