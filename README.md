@@ -91,6 +91,7 @@ Catalog entry:
  :kafka/topic "topic"
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/serializer-fn :my.ns/serializer-fn
+ :kafka/request-size 307200
  :onyx/batch-size batch-size
  :onyx/doc "Writes messages to a Kafka topic"}
 ```
@@ -113,6 +114,7 @@ Segments supplied to a write-messages task should be in in the following form:
 |`:kafka/topic`              | `string`  |         | The topic name to connect to
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
 |`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
+|`:kafka/request-size`       | `number`  |         | The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer.
 
 #### Test Utilities
 
