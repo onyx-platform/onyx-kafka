@@ -8,6 +8,7 @@ set -o xtrace
 cd "$(dirname "$0")/.."
 
 new_version=$1
+core_version=$1
 release_branch=$2
 current_version=`lein pprint :version | sed s/\"//g`
 
@@ -19,7 +20,7 @@ fi
 # Update to release version.
 git checkout master
 lein set-version $new_version
-lein update-dependency org.onyxplatform/onyx $new_version
+lein update-dependency org.onyxplatform/onyx $core_version
 sed -i.bak "s/$current_version/$new_version/g" README.md
 git add README.md project.clj
 
