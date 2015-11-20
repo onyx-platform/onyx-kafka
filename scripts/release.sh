@@ -7,20 +7,35 @@ set -o xtrace
 
 cd "$(dirname "$0")/.."
 
+if [[ "$#" -ne 2 ]]; then
+	echo "Usage: $0 new-version release-branch"
+	echo "Example: $0 0.8.0.4 0.8.x"
+	echo "Three digit release number e.g. 0.8.0 will update onyx dependency and release plugin as 0.8.0.0"
+fi
+
 new_version=$1
-core_version=$1
 release_branch=$2
 current_version=`lein pprint :version | sed s/\"//g`
 
-if [[ "$new_version" == *.0 ]]
+if [[ "$new_version" == *.*.*.* ]]; 
+then 
+	echo "Four digit release number "$new_version" therefore releasing plugin without updating Onyx dependency"
+elif [[ "$new_version" == *.*.* ]]; 
 then
-    new_version="$new_version.0"
+	core_version=$new_version
+	lein update-dependency org.onyxplatform/onyx $core_version
+	new_version="$new_version.0"
+else
+	echo "Unhandled version number scheme. Exiting"
+	exit 1
 fi
 
 # Update to release version.
 git checkout master
+git stash
+git pull
 lein set-version $new_version
-lein update-dependency org.onyxplatform/onyx $core_version
+
 sed -i.bak "s/$current_version/$new_version/g" README.md
 git add README.md project.clj
 
