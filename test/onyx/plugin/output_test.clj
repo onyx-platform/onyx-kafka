@@ -46,7 +46,7 @@
 
 (with-open [zk (kadmin/zk-client zk-addr)]
   (kadmin/create-topic zk topic
-                       {:partitions 3}))
+                       {:partitions 1}))
 
 (def workflow
   [[:in :identity]
@@ -86,7 +86,6 @@
               :message {:n 0}})
 (>!! in-chan {:message {:n 1}})
 (>!! in-chan {:key "tarein"
-              :partition 1
               :message {:n 2}})
 (>!! in-chan :done)
 
@@ -118,18 +117,15 @@
   (fact (->> messages
              (sort-by (comp :n :value))
              (map (fn [msg] 
-                    (select-keys (if-not (= "tarein" (:key msg)) 
-                                   (assoc msg :partition nil)
-                                   msg) 
-                                 [:key :value :partition]))))
+                    (select-keys msg [:key :value :partition]))))
         => [{:key 1
-             :partition nil
+             :partition 0
              :value {:n 0}} 
             {:key nil
-             :partition nil
+             :partition 0
              :value {:n 1}} 
             {:key "tarein" 
-             :partition 1
+             :partition 0
              :value {:n 2}}]))
 
 (doseq [v-peer v-peers]
