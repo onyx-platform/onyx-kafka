@@ -21,6 +21,11 @@ version_base=$(echo "$1"|sed s/"-.*"//g)
 release_branch=$2
 current_version=`lein pprint :version | sed s/\"//g`
 
+# Update to release version.
+git checkout master
+git stash
+git pull
+
 if [[ "$new_version" == *[.]*[.]*[.]* ]]; 
 then 
 	echo "Four digit release number "$new_version" therefore releasing plugin without updating Onyx dependency"
@@ -40,10 +45,6 @@ else
 	exit 1
 fi
 
-# Update to release version.
-git checkout master
-git stash
-git pull
 lein set-version $new_plugin_version
 
 sed -i.bak "s/$current_version/$new_plugin_version/g" README.md
