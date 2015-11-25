@@ -56,9 +56,9 @@ git push origin $new_plugin_version
 git push origin master
 
 # Merge artifacts into release branch.
-git checkout $release_branch
+git checkout -b $release_branch
 git merge -m "Merge branch 'master' into $release_branch" master -X theirs
-git push origin $release_branch
+git push -u origin $release_branch
 
 # Prepare next release cycle.
 git checkout master
