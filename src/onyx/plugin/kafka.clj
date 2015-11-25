@@ -8,6 +8,7 @@
             [zookeeper :as zk]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.types :as t]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.function :as function]
             [onyx.peer.operation :refer [kw->fn]]
@@ -104,8 +105,7 @@
                 (let [message ^KafkaMessage (first ms)
                       next-offset ^int (.offset message)
                       dm (deserializer-fn (.value message))]
-                  (>!! ch (assoc (t/input (java.util.UUID/randomUUID)
-                                          dm)
+                  (>!! ch (assoc (t/input (random-uuid) dm)
                                  :offset next-offset))
                   (recur (rest ms) (inc next-offset)))))
             (finally
@@ -176,7 +176,7 @@
                        (map (fn [_]
                               (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
                                 (if (= (:message result) :done)
-                                  (t/input (java.util.UUID/randomUUID) :done)
+                                  (t/input (random-uuid) :done)
                                   result))))
                        (filter :message)))]
       (doseq [m batch]
@@ -202,8 +202,7 @@
   (retry-segment
     [_ _ segment-id]
     (when-let [msg (get @pending-messages segment-id)]
-      (>!! read-ch (t/input (java.util.UUID/randomUUID)
-                            (:message msg)))
+      (>!! read-ch (t/input (random-uuid) (:message msg)))
       (swap! pending-messages dissoc segment-id)))
 
   (pending?
