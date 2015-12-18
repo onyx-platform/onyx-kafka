@@ -1,6 +1,6 @@
 (defproject org.onyxplatform/onyx-kafka "0.8.3.1-SNAPSHOT"
   :description "Onyx plugin for Kafka"
-  :url "https://github.com/MichaelDrogalis/onyx-kafka"
+  :url "https://github.com/onyx-platform/onyx-kafka"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :repositories {"snapshots" {:url "https://clojars.org/repo"
