@@ -113,7 +113,8 @@
         (catch InterruptedException e
           (throw e))
         (catch Throwable e
-          (fatal e))))
+          ;; pass exception back to reader thread
+          (>!! ch (t/input (random-uuid) e)))))
     (catch InterruptedException e
       (throw e))))
 
@@ -180,6 +181,9 @@
                                   result))))
                        (filter :message)))]
       (doseq [m batch]
+        (when (instance? java.lang.Throwable (:message m))
+          (throw (:message m)))
+
         (swap! pending-messages assoc (:id m) m))
       (when (and (all-done? (vals @pending-messages))
                  (all-done? batch)
@@ -286,10 +290,18 @@
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))]
     (->KafkaWriteMessages config topic producer serializer-fn)))
 
+(defn read-handle-exception [event lifecycle lf-kw exception]
+  :restart)
+
 (def read-messages-calls
   {:lifecycle/before-task-start start-kafka-consumer
+   :lifecycle/handle-exception read-handle-exception
    :lifecycle/after-task-stop close-read-messages})
+
+(defn write-handle-exception [event lifecycle lf-kw exception]
+  :restart)
 
 (def write-messages-calls
   {:lifecycle/before-task-start inject-write-messages
+   :lifecycle/handle-exception write-handle-exception
    :lifecycle/after-task-stop close-write-resources})
