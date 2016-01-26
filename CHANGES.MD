@@ -1,3 +1,7 @@
+# 0.8.6
+* Fixed issue where exception was not passed back from the kafka reader thread to read-batch. This meant that peers could become zombies and stop reading from the topic.
+
+
 # 0.7.2.3
 Support auto-assigned partitions.
 
