@@ -121,7 +121,7 @@
 
 (def stopped-server (component/stop kafka-server))
 
-(Thread/sleep 4000)
+(Thread/sleep 6000)
 
 (def started-again (component/start stopped-server))
 
