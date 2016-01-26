@@ -117,7 +117,7 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(Thread/sleep 10000)
+(Thread/sleep 20000)
 
 (def stopped-server (component/stop kafka-server))
 
