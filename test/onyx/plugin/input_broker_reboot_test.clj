@@ -8,7 +8,7 @@
             [onyx.api]
             [midje.sweet :refer :all]))
 
-(def id (java.util.UUID/randomUUID))
+(comment (def id (java.util.UUID/randomUUID))
 
 (def env-config
   {:zookeeper/address "127.0.0.1:2188"
@@ -117,7 +117,7 @@
   :lifecycles lifecycles
   :task-scheduler :onyx.task-scheduler/balanced})
 
-(Thread/sleep 10000)
+(Thread/sleep 20000)
 
 (def stopped-server (component/stop kafka-server))
 
@@ -147,4 +147,4 @@
 
 (onyx.api/shutdown-env env)
 
-(component/stop kafka-server)
+(component/stop kafka-server))
