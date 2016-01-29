@@ -21,7 +21,7 @@
    :kafka/chan-capacity 1000
    :kafka/empty-read-back-off 500
    :kafka/commit-interval 2000
-   :kafka/wrap-message? false})
+   :kafka/wrap-with-metadata? false})
 
 (defn log-id [replica-val job-id peer-id task-id]
   (get-in replica-val [:task-slot-ids job-id task-id peer-id]))
@@ -95,10 +95,17 @@
               commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
               commit-fut (future (commit-loop group-id m topic kpartition commit-interval pending-commits))
               deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
-              wrap-message? (or (:kafka/wrap-message? task-map) (:kafka/wrap-message? defaults))
+              wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
               wrapper-fn (if wrap-message?
-                           (fn [msg off] {:offset off :message msg :topic topic :partitions kpartition})
-                           (fn [msg off] msg))]
+                           (fn [^KafkaMessage kafka-message value off] 
+                             {:offset off 
+                              :message value 
+                              :topic topic 
+                              ; There appears to be a bug in clj-kafka
+                              ; so we will just supply the know information in the static case
+                              :partition kpartition
+                              :key (:key kafka-message)})
+                           (fn [_ value _] value))]
           (log/info (str "Kafka consumer is starting at offset " offset))
           (try
             (loop [ms (kc/messages consumer "onyx" topic kpartition offset fetch-size)
@@ -110,7 +117,7 @@
                 (let [message ^KafkaMessage (first ms)
                       next-offset ^int (.offset message)
                       dm (deserializer-fn (.value message))
-                      wrapped (wrapper-fn dm next-offset)]
+                      wrapped (wrapper-fn message dm next-offset)]
                   (>!! ch (assoc (t/input (random-uuid) wrapped)
                                  :offset next-offset))
                   (recur (rest ms) (inc next-offset)))))
