@@ -77,7 +77,7 @@ Lifecycle entry:
 |`:kafka/empty-read-back-off`| `integer` |`500`    | The amount of time to back off between reads when nothing was fetched from a consumer
 |`:kafka/commit-interval`    | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
 |`:kafka/deserializer-fn`    | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
-|`:kafka/wrap-with-metadata?`| `boolean` |`false`  | Wraps message into map with keys `:offset`, `:partitions`, `:topic` and `:message` itself
+|`:kafka/wrap-with-metadata?`| `boolean` |`false`  | Wraps message into map with keys `:offset`, `:partition`, `:topic`, `:key` and `:message` itself
 
 ##### write-messages
 
