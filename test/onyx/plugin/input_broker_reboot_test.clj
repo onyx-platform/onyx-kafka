@@ -55,9 +55,6 @@
   [[:read-messages :identity]
    [:identity :out]])
 
-(defn restartable? [e] 
-  true)
-
 (def catalog
   [{:onyx/name :read-messages
     :onyx/plugin :onyx.plugin.kafka/read-messages
@@ -73,7 +70,6 @@
     :kafka/empty-read-back-off 500
     :kafka/commit-interval 500
     :kafka/deserializer-fn ::deserialize-message
-    :onyx/restart-pred-fn ::restartable?
     :onyx/max-peers 1
     :onyx/batch-size 2
     :onyx/doc "Reads messages from a Kafka topic"}
@@ -101,9 +97,14 @@
 
 (def batch-num (atom 0))
 
+(def restartable-reader
+  {:lifecycle/handle-exception (constantly :restart)})
+
 (def lifecycles
   [{:lifecycle/task :read-messages
     :lifecycle/calls :onyx.plugin.kafka/read-messages-calls}
+   {:lifecycle/task :read-messages
+    :lifecycle/calls ::restartable-reader}
    {:lifecycle/task :out
     :lifecycle/calls ::out-calls}
    {:lifecycle/task :out
