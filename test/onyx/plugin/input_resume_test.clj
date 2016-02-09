@@ -59,9 +59,6 @@
   [[:read-messages :identity]
    [:identity :out]])
 
-(defn restartable? [e] 
-  true)
-
 (def catalog
   [{:onyx/name :read-messages
     :onyx/plugin :onyx.plugin.kafka/read-messages
@@ -77,7 +74,6 @@
     :kafka/empty-read-back-off 500
     :kafka/commit-interval 500
     :kafka/deserializer-fn :onyx.plugin.input-resume-test/deserialize-message
-    :onyx/restart-pred-fn :onyx.plugin.input-resume-test/restartable?
     :onyx/max-peers 1
     :onyx/batch-size 2
     :onyx/doc "Reads messages from a Kafka topic"}
@@ -112,7 +108,8 @@
      ; since we want to ensure that the batches aren't re-read on restart for ease of testing
      (Thread/sleep 7000)
      (when (= (swap! batch-num inc) 2)
-       (throw (ex-info "Restartable" {:restartable? true}))))})
+       (throw (ex-info "Restartable" {:restartable? true}))))
+   :lifecycle/handle-exception (fn [& e] true)})
 
 (def lifecycles
   [{:lifecycle/task :read-messages
