@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-kafka "0.8.10.1-SNAPSHOT"
+(defproject org.onyxplatform/onyx-kafka "0.8.10.2-SNAPSHOT"
   :description "Onyx plugin for Kafka"
   :url "https://github.com/onyx-platform/onyx-kafka"
   :license {:name "Eclipse Public License"
