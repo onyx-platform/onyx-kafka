@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-kafka "0.8.10.1-SNAPSHOT"
+(defproject org.onyxplatform/onyx-kafka "0.8.10.2-SNAPSHOT"
   :description "Onyx plugin for Kafka"
   :url "https://github.com/onyx-platform/onyx-kafka"
   :license {:name "Eclipse Public License"
@@ -17,7 +17,8 @@
                  [clj-kafka "0.3.4" :exclusions [org.apache.zookeeper/zookeeper zookeeper-clj]]
                  [com.stuartsierra/component "0.2.3"]
                  [cheshire "5.5.0"]
-                 [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]]
+                 [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
+                 [prismatic/schema "1.0.5"]]
   :profiles {:dev {:dependencies [[midje "1.7.0"]]
                    :plugins [[lein-midje "3.1.3"]
                              [lein-set-version "0.4.1"]
