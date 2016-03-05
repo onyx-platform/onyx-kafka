@@ -1,154 +1,86 @@
 (ns onyx.plugin.input-test
-  (:require [clojure.core.async :refer [chan >!! <!!]]
-            [onyx.plugin.core-async :refer [take-segments!]]
+  (:require [aero.core :refer [read-config]]
+            [clj-kafka
+             [admin :as kadmin]
+             [producer :as kp]]
+            [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [taoensso.timbre :refer [info error] :as timbre]
-            [onyx.plugin.kafka]
-            [clj-kafka.producer :as kp]
-            [clj-kafka.admin :as kadmin]
-            [onyx.kafka.embedded-server :as ke]
-            [onyx.api]
-            [midje.sweet :refer :all]))
+            [onyx api
+             [job :refer [add-task]]
+             [test-helper :refer [with-test-env]]]
+            [onyx.kafka
+             [embedded-server :as ke]
+             [tasks :refer [kafka-input]]]
+            [onyx.plugin
+             [core-async :refer [take-segments!]]
+             [core-async-tasks :as core-async]
+             [kafka]]))
 
-(def id (java.util.UUID/randomUUID))
+(defn build-job [zk-address topic batch-size batch-timeout]
+  (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
+        base-job (merge {:workflow [[:read-messages :identity]
+                                    [:identity :out]]
+                         :catalog [(merge {:onyx/name :identity
+                                           :onyx/fn :clojure.core/identity
+                                           :onyx/type :function}
+                                          batch-settings)]
+                         :lifecycles []
+                         :windows []
+                         :triggers []
+                         :flow-conditions []
+                         :task-scheduler :onyx.task-scheduler/balanced})]
+    (-> base-job
+        (add-task (kafka-input :read-messages
+                               (merge {:kafka/topic topic
+                                       :kafka/group-id "onyx-consumer"
+                                       :kafka/zookeeper "127.0.0.1:2181"
+                                       :kafka/offset-reset :smallest
+                                       :kafka/force-reset? true
+                                       :kafka/deserializer-fn :onyx.kafka.tasks/deserialize-message-edn
+                                       :onyx/min-peers 2
+                                       :onyx/max-peers 2}
+                                      batch-settings)))
+        (add-task (core-async/output-task :out batch-settings)))))
 
-(def zk-addr "127.0.0.1:2188")
+(defn mock-kafka [topic zookeeper]
+  (let [kafka-server (component/start
+                      (ke/map->EmbeddedKafka {:hostname "127.0.0.1"
+                                              :port 9092
+                                              :broker-id 0
+                                              :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
+                                              :zookeeper-addr zookeeper}))
+        _ (with-open [zk (kadmin/zk-client zookeeper)]
+            (kadmin/create-topic zk topic
+                                 {:partitions 2}))
+        producer1 (kp/producer
+                   {"metadata.broker.list" "127.0.0.1:9092"
+                    "serializer.class" "kafka.serializer.DefaultEncoder"
+                    "partitioner.class" "kafka.producer.DefaultPartitioner"})
+        producer2 (kp/producer
+                   {"metadata.broker.list" "127.0.0.1:9092"
+                    "serializer.class" "kafka.serializer.DefaultEncoder"
+                    "partitioner.class" "kafka.producer.DefaultPartitioner"})]
 
-(def env-config
-  {:zookeeper/address zk-addr
-   :zookeeper/server? true
-   :zookeeper.server/port 2188
-   :onyx/tenancy-id id})
+    (do (doseq [x (range 3)] ;0 1 2
+          (kp/send-message producer1 (kp/message topic (.getBytes (pr-str {:n x})))))
+        (doseq [x (range 3)] ;3 4 5
+          (kp/send-message producer2 (kp/message topic (.getBytes (pr-str {:n (+ 3 x)})))))
+        kafka-server)))
 
-(def peer-config
-  {:zookeeper/address zk-addr
-   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.messaging/impl :aeron
-   :onyx.messaging/peer-port 40199
-   :onyx.messaging/bind-addr "localhost"
-   :onyx/tenancy-id id})
-
-(def env (onyx.api/start-env env-config))
-
-(def kafka-server
-  (component/start 
-    (ke/map->EmbeddedKafka {:hostname "127.0.0.1" 
-                            :port 9092
-                            :broker-id 0
-                            :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
-                            :zookeeper-addr zk-addr})))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
-(def topic (str "onyx-test-" (java.util.UUID/randomUUID)))
-
-
-(with-open [zk (kadmin/zk-client zk-addr)]
-  (kadmin/create-topic zk topic
-                      {:partitions 2}))
-
-
-(def producer
-  (kp/producer
-   {"metadata.broker.list" "127.0.0.1:9092"
-    "serializer.class" "kafka.serializer.DefaultEncoder"
-    "partitioner.class" "kafka.producer.DefaultPartitioner"}))
-
-(kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 1}))))
-(kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 2}))))
-(kp/send-message producer (kp/message topic (.getBytes (pr-str {:n 3}))))
-
-
-(def producer2
-  (kp/producer
-   {"metadata.broker.list" "127.0.0.1:9092"
-    "serializer.class" "kafka.serializer.DefaultEncoder"
-    "partitioner.class" "kafka.producer.DefaultPartitioner"}))
-
-(kp/send-message producer2 (kp/message topic (.getBytes (pr-str {:n 4}))))
-(kp/send-message producer2 (kp/message topic (.getBytes (pr-str {:n 5}))))
-(kp/send-message producer2 (kp/message topic (.getBytes (pr-str {:n 6}))))
-
-(defn deserialize-message [bytes]
-  (read-string (String. bytes "UTF-8")))
-
-(def workflow
-  [[:read-messages :identity]
-   [:identity :out]])
-
-(def catalog
-  [{:onyx/name :read-messages
-    :onyx/plugin :onyx.plugin.kafka/read-messages
-    :onyx/type :input
-    :onyx/medium :kafka
-    :kafka/topic topic
-    :kafka/group-id "onyx-consumer"
-    :kafka/fetch-size 307200
-    :kafka/chan-capacity 1000
-    :kafka/zookeeper zk-addr
-    :kafka/offset-reset :smallest
-    :kafka/force-reset? true
-    :kafka/empty-read-back-off 500
-    :kafka/commit-interval 500
-    :kafka/deserializer-fn :onyx.plugin.input-test/deserialize-message
-    :onyx/min-peers 2
-    :onyx/max-peers 2
-    :onyx/batch-size 100
-    :onyx/doc "Reads messages from a Kafka topic"}
-
-   {:onyx/name :identity
-    :onyx/fn :clojure.core/identity
-    :onyx/type :function
-    :onyx/batch-size 100}
-
-   {:onyx/name :out
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/max-peers 1
-    :onyx/batch-size 100
-    :onyx/doc "Writes segments to a core.async channel"}])
-
-(def out-chan (chan 100))
-
-(defn inject-out-ch [event lifecycle]
-  {:core.async/chan out-chan})
-
-(def out-calls
-  {:lifecycle/before-task-start inject-out-ch})
-
-(def lifecycles
-  [{:lifecycle/task :read-messages
-    :lifecycle/calls :onyx.plugin.kafka/read-messages-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.input-test/out-calls}
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
-
-(def v-peers (onyx.api/start-peers 4 peer-group))
-
-(onyx.api/submit-job
- peer-config
- {:catalog catalog :workflow workflow
-  :lifecycles lifecycles
-  :task-scheduler :onyx.task-scheduler/balanced})
-
-;; remove me after learning how to handle the sentinel
-(Thread/sleep 10000)
-
-;; do not send done, as it is not supported for multiple partitions
-
-(def results (doall (map (fn [_] (<!! out-chan)) (range 6))))
-
-(fact (sort-by :n results) 
-      => [{:n 1} {:n 2} {:n 3} 
-          {:n 4} {:n 5} {:n 6}])
-
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-peer-group peer-group)
-
-(onyx.api/shutdown-env env)
-
-(component/stop kafka-server)
+(deftest kafka-input-test
+  (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
+        zk-address "127.0.0.1:2181"
+        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
+                                                      {:profile :test})
+        job (build-job zk-address test-topic 10 1000)
+        {:keys [out read-messages]} (core-async/get-core-async-channels job)
+        mock (atom {})]
+    (try
+      (with-test-env [test-env [4 env-config peer-config]]
+        (let [_ (onyx.test-helper/validate-enough-peers! test-env job)
+              mock (reset! mock (mock-kafka test-topic zk-address))
+              {:keys [job-id]} (onyx.api/submit-job peer-config job)
+              results (mapv :n (onyx.plugin.core-async/take-segments! out 5000))]
+          (is (= 15
+                 (reduce + results)))))
+      (finally (swap! mock component/stop)))))
