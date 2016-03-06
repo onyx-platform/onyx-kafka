@@ -42,7 +42,10 @@
                                       batch-settings)))
         (add-task (core-async/output-task :out batch-settings)))))
 
-(defn mock-kafka [topic zookeeper]
+(defn mock-kafka
+  "Use a custom version of mock-kafka as opposed to the one in test-utils
+  because we need to spawn 2 producers in order to write to each partition"
+  [topic zookeeper]
   (let [kafka-server (component/start
                       (ke/map->EmbeddedKafka {:hostname "127.0.0.1"
                                               :port 9092
@@ -77,10 +80,9 @@
         mock (atom {})]
     (try
       (with-test-env [test-env [4 env-config peer-config]]
-        (let [_ (onyx.test-helper/validate-enough-peers! test-env job)
-              mock (reset! mock (mock-kafka test-topic zk-address))
-              {:keys [job-id]} (onyx.api/submit-job peer-config job)
-              results (mapv :n (onyx.plugin.core-async/take-segments! out 5000))]
-          (is (= 15
-                 (reduce + results)))))
+        (onyx.test-helper/validate-enough-peers! test-env job)
+        (reset! mock (mock-kafka test-topic zk-address))
+        (onyx.api/submit-job peer-config job)
+        (is (= 15
+               (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 5000))))))
       (finally (swap! mock component/stop)))))

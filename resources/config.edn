@@ -12,8 +12,9 @@
                             :test true}
   :zookeeper.server/port 2181}
  :peer-config
- {:onyx/tenancy-id                       #path [:env-config :onyx/tenancy-id]
-  :zookeeper/address                     #path [:env-config :zookeeper/address]
+ {:onyx/tenancy-id                       #env [ONYX_ID "testcluster"]
+  :zookeeper/address                     #cond {:default #env [ZOOKEEPER "zookeeper"]
+                                                :test "127.0.0.1"}
   :onyx.peer/job-scheduler               :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout           60000
   :onyx.messaging/allow-short-circuit?   #cond {:default true

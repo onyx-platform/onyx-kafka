@@ -1,19 +1,15 @@
 (ns onyx.plugin.input-static-partition-test
   (:require [aero.core :refer [read-config]]
-            [clj-kafka
-             [admin :as kadmin]
-             [producer :as kp]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
             [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.kafka
-             [embedded-server :as ke]
-             [tasks :refer [kafka-input]]]
+            [onyx.kafka.tasks :refer [kafka-input]]
             [onyx.plugin
              [core-async :refer [take-segments!]]
              [core-async-tasks :as core-async]
+             [test-utils :as test-utils]
              [kafka]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
@@ -42,24 +38,6 @@
                                       batch-settings)))
         (add-task (core-async/output-task :out batch-settings)))))
 
-(defn mock-kafka [topic zookeeper]
-  (let [kafka-server (component/start
-                      (ke/map->EmbeddedKafka {:hostname "127.0.0.1"
-                                              :port 9092
-                                              :broker-id 0
-                                              :log-dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
-                                              :zookeeper-addr zookeeper}))
-        _ (with-open [zk (kadmin/zk-client zookeeper)]
-            (kadmin/create-topic zk topic
-                                 {:partitions 1}))
-        producer1 (kp/producer
-                   {"metadata.broker.list" "127.0.0.1:9092"
-                    "serializer.class" "kafka.serializer.DefaultEncoder"
-                    "partitioner.class" "kafka.producer.DefaultPartitioner"})]
-    (doseq [x [{:n 1} {:n 2} {:n 3} :done]]
-      (kp/send-message producer1 (kp/message topic (.getBytes (pr-str x)))))
-    kafka-server))
-
 (deftest kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         zk-address "127.0.0.1:2181"
@@ -67,13 +45,13 @@
                                                       {:profile :test})
         job (build-job zk-address test-topic 10 1000)
         {:keys [out read-messages]} (core-async/get-core-async-channels job)
+        test-data [{:n 1} {:n 2} {:n 3} :done]
         mock (atom {})]
     (try
       (with-test-env [test-env [4 env-config peer-config]]
-        (let [_ (onyx.test-helper/validate-enough-peers! test-env job)
-              mock (reset! mock (mock-kafka test-topic zk-address))
-              {:keys [job-id]} (onyx.api/submit-job peer-config job)
-              results (onyx.plugin.core-async/take-segments! out)]
-          (is (= results
-                 [{:n 1} {:n 2} {:n 3} :done]))))
+        (onyx.test-helper/validate-enough-peers! test-env job)
+        (reset! mock (mock-kafka test-topic zk-address))
+        (onyx.api/submit-job peer-config job)
+        (is (= (onyx.plugin.core-async/take-segments! out)
+               test-data)))
       (finally (swap! mock component/stop)))))

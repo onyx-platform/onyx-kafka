@@ -19,7 +19,7 @@
                  [cheshire "5.5.0"]
                  [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
                  [prismatic/schema "1.0.5"]
-                 [aero "0.2.0-SNAPSHOT"]]
+                 [aero "0.1.3"]]
   :profiles {:dev {:dependencies [[midje "1.7.0"]]
                    :plugins [[lein-midje "3.1.3"]
                              [lein-set-version "0.4.1"]
