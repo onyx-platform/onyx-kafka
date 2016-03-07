@@ -53,7 +53,7 @@
        (throw (ex-info "Restartable" {:restartable? true}))))
    :lifecycle/handle-exception (constantly :restart)})
 
-(deftest kafka-input-test
+(deftest kafka-resume-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         zk-address "127.0.0.1:2181"
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")

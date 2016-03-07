@@ -7,6 +7,7 @@
              [test-helper :refer [with-test-env]]]
             [onyx.kafka.tasks :refer [kafka-input]]
             [onyx.plugin
+             [test-utils :as test-utils]
              [core-async :refer [take-segments!]]
              [core-async-tasks :as core-async]
              [test-utils :as test-utils]
@@ -38,7 +39,7 @@
                                       batch-settings)))
         (add-task (core-async/output-task :out batch-settings)))))
 
-(deftest kafka-input-test
+(deftest kafka-static-partition-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         zk-address "127.0.0.1:2181"
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
@@ -50,7 +51,7 @@
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (mock-kafka test-topic zk-address))
+        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data))
         (onyx.api/submit-job peer-config job)
         (is (= (onyx.plugin.core-async/take-segments! out)
                test-data)))
