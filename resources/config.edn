@@ -7,14 +7,14 @@
   :onyx.bookkeeper/local-quorum-ports [3196 3197 3198]
   :onyx.bookkeeper/port 3196
   :zookeeper/address #cond {:default #env [ZOOKEEPER "zookeeper"]
-                            :test "127.0.0.1"}
+                            :test "127.0.0.1:2188"}
   :zookeeper/server? #cond {:default false
                             :test true}
-  :zookeeper.server/port 2181}
+  :zookeeper.server/port 2188}
  :peer-config
  {:onyx/tenancy-id                       #env [ONYX_ID "testcluster"]
   :zookeeper/address                     #cond {:default #env [ZOOKEEPER "zookeeper"]
-                                                :test "127.0.0.1"}
+                                                :test "127.0.0.1:2188"}
   :onyx.peer/job-scheduler               :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout           60000
   :onyx.messaging/allow-short-circuit?   #cond {:default true

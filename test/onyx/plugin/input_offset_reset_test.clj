@@ -31,7 +31,7 @@
         (add-task (kafka-input :read-messages
                                (merge {:kafka/topic topic
                                        :kafka/group-id "onyx-consumer"
-                                       :kafka/zookeeper "127.0.0.1:2181"
+                                       :kafka/zookeeper zk-address
                                        :kafka/offset-reset :smallest
                                        :kafka/force-reset? true
                                        :kafka/empty-read-back-off 500
@@ -56,9 +56,10 @@
 
 (deftest kafka-offset-reset-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
-        zk-address "127.0.0.1:2181"
+
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
+        zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
         {:keys [out read-messages]} (core-async/get-core-async-channels job)
         test-data [{:n 1} {:n 2} {:n 3} {:n 4} {:n 5} {:n 6} :done]

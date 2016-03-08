@@ -31,7 +31,7 @@
         (add-task (kafka-input :read-messages
                                (merge {:kafka/topic topic
                                        :kafka/group-id "onyx-consumer"
-                                       :kafka/zookeeper "127.0.0.1:2181"
+                                       :kafka/zookeeper zk-address
                                        :kafka/offset-reset :smallest
                                        :kafka/force-reset? false
                                        :kafka/deserializer-fn :onyx.kafka.tasks/deserialize-message-edn
@@ -45,9 +45,9 @@
 
 (deftest kafka-broker-reboot-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
-        zk-address "127.0.0.1:2181"
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
+        zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
         {:keys [out read-messages]} (core-async/get-core-async-channels job)
         test-data1 [{:n 1}]

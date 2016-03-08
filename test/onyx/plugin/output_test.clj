@@ -44,9 +44,9 @@
 
 (deftest kafka-output-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
-        zk-address "127.0.0.1:2181"
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
+        zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
         {:keys [in]} (core-async/get-core-async-channels job)
         mock (atom {})
