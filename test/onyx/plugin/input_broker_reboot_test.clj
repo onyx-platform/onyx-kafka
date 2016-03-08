@@ -14,7 +14,7 @@
   {:zookeeper/address "127.0.0.1:2188"
    :zookeeper/server? true
    :zookeeper.server/port 2188
-   :onyx/id id})
+   :onyx/tenancy-id id})
 
 (def peer-config
   {:zookeeper/address "127.0.0.1:2188"
@@ -22,7 +22,7 @@
    :onyx.messaging/impl :aeron
    :onyx.messaging/peer-port 40199
    :onyx.messaging/bind-addr "localhost"
-   :onyx/id id})
+   :onyx/tenancy-id id})
 
 (def env (onyx.api/start-env env-config))
 
