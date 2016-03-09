@@ -3,11 +3,6 @@ dependencies:
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
 
-test:
-  override:
-    - lein with-profile dev,circle-ci midje:
-        timeout: 240
-
 machine:
   java:
     version: oraclejdk8
