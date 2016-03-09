@@ -65,6 +65,6 @@
         (swap! mock component/start)
         (Thread/sleep 5000)
         (doseq [x test-data2] (>!! input-chan x))
-        (is (= (into test-data1 test-data2)
-             (onyx.plugin.core-async/take-segments! out))))
+        (is (= (set (into test-data1 test-data2))
+               (set (onyx.plugin.core-async/take-segments! out)))))
       (finally (swap! mock component/stop)))))
