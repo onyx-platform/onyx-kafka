@@ -16,8 +16,8 @@
      (zkcore/with-resource [c (zkconsumer/consumer kafka-config)]
        zkconsumer/shutdown
        (->> (zkconsumer/messages c topic)
-            (map (fn [msg] (-> msg 
-                               (update :key #(if % 
+            (map (fn [msg] (-> msg
+                               (update :key #(if %
                                                (decompress-fn %)))
                                (update :value decompress-fn))))
             (take-while (fn [v] (not= :done (:value v))))
@@ -28,6 +28,6 @@
   "Reads segments from a topic until a :done is reached."
   ([zk-addr topic decompress-fn] (take-segments zk-addr topic decompress-fn {}))
   ([zk-addr topic decompress-fn opts]
-   (conj (mapv :value 
+   (conj (mapv :value
                (take-until-done zk-addr topic decompress-fn opts))
          :done)))

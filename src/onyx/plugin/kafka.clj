@@ -152,7 +152,7 @@
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         client-id "onyx"
         m {"zookeeper.connect" (:kafka/zookeeper task-map)}
-        partitions (:partitions pipeline)
+        partitions (kzk/partitions m (:kafka/topic task-map))
         n-partitions (count partitions)
         _ (check-num-peers-equals-partitions task-map n-partitions)
         ch (:read-ch pipeline)
@@ -163,18 +163,23 @@
         task-id (:onyx.core/task-id event)
         reader-fut (future (reader-loop m client-id group-id topic partition partitions task-map 
                                         (:onyx.core/replica event) job-id peer-id task-id
-                                        ch pending-commits))]
+                                        ch pending-commits))
+        done-unsupported? (and (> (count partitions) 1)
+                               (not (:kafka/partition task-map)))]
+
     {:kafka/read-ch ch
      :kafka/reader-future reader-fut
      :kafka/pending-messages pending-messages
-     :kafka/pending-commits pending-commits}))
+     :kafka/pending-commits pending-commits
+     :kafka/done-unsupported? done-unsupported?}))
 
 (defn all-done? [messages]
   (empty? (remove #(= :done (:message %))
                   messages)))
 
-(defrecord KafkaReadMessages [max-pending batch-size batch-timeout partitions done-unsupported? 
-                              pending-messages pending-commits drained? read-ch]
+(defrecord KafkaReadMessages
+    [max-pending batch-size batch-timeout pending-messages
+     pending-commits drained? read-ch]
   p-ext/Pipeline
   (write-batch
     [this event]
@@ -200,10 +205,10 @@
         (swap! pending-messages assoc (:id m) m))
       (when (and (all-done? (vals @pending-messages))
                  (all-done? batch)
-		 (zero? (count (.buf read-ch)))
+                 (zero? (count (.buf read-ch)))
                  (or (not (empty? @pending-messages))
                      (not (empty? batch))))
-        (if done-unsupported? 
+        (if (:kafka/done-unsupported? event)
           (throw (UnsupportedOperationException. ":done is not supported for auto assigned kafka partitions. 
                                                  (:kafka/partition must be supplied)"))
           (reset! drained? true)))
@@ -237,15 +242,13 @@
         batch-timeout (arg-or-default :onyx/batch-timeout catalog-entry)
         chan-capacity (or (:kafka/chan-capacity catalog-entry) (:kafka/chan-capacity defaults))
         m {"zookeeper.connect" (:kafka/zookeeper catalog-entry)}
-        partitions (kzk/partitions m (:kafka/topic catalog-entry))
-        done-unsupported? (and (> (count partitions) 1) 
-                               (not (:kafka/partition catalog-entry)))
         ch (chan chan-capacity)
         pending-messages (atom {})
         pending-commits (atom (sorted-set))
         drained? (atom false)]
-    (->KafkaReadMessages max-pending batch-size batch-timeout partitions done-unsupported?
-                         pending-messages pending-commits drained? ch)))
+    (->KafkaReadMessages
+     max-pending batch-size batch-timeout
+     pending-messages pending-commits drained? ch)))
 
 (defn close-read-messages
   [{:keys [kafka/read-ch] :as pipeline} lifecycle]
