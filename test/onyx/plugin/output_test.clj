@@ -3,22 +3,21 @@
             [clj-kafka
              [admin :as kadmin]
              [producer :as kp]]
-            [clojure.test :refer [deftest is]]
+            [clojure.core.async :refer [<!! go pipe]]
             [clojure.core.async.lab :refer [spool]]
-            [clojure.core.async :refer [go pipe <!!]]
+            [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [onyx api
+            [onyx api 
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.kafka
              [embedded-server :as ke]
-             [tasks :refer [kafka-output]]
              [utils :refer [take-until-done]]]
-            [onyx.plugin
-             [test-utils :as test-utils]
+            [onyx.plugin kafka 
              [core-async :refer [take-segments!]]
              [core-async-tasks :as core-async]
-             [kafka]]))
+             [test-utils :as test-utils]]
+            [onyx.tasks.kafka :refer [kafka-output]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -38,7 +37,7 @@
         (add-task (kafka-output :write-messages
                                 (merge {:kafka/topic topic
                                         :kafka/zookeeper zk-address
-                                        :kafka/serializer-fn :onyx.kafka.tasks/serialize-message-edn
+                                        :kafka/serializer-fn :onyx.tasks.kafka/serialize-message-edn
                                         :kafka/request-size 307200}
                                        batch-settings))))))
 

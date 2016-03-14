@@ -3,15 +3,14 @@
             [clojure.core.async :refer [>!! chan]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [onyx api
+            [onyx api 
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.kafka.tasks :refer [kafka-input]]
-            [onyx.plugin
+            [onyx.plugin kafka 
              [core-async :refer [take-segments!]]
              [core-async-tasks :as core-async]
-             [test-utils :as test-utils]
-             [kafka]]))
+             [test-utils :as test-utils]]
+            [onyx.tasks.kafka :refer [kafka-input]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -34,7 +33,7 @@
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :smallest
                                        :kafka/force-reset? false
-                                       :kafka/deserializer-fn :onyx.kafka.tasks/deserialize-message-edn
+                                       :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))

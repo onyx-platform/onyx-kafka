@@ -1,4 +1,4 @@
-(ns onyx.kafka.tasks
+(ns onyx.tasks.kafka
   (:require [cheshire.core :as json]
             [schema.core :as s]
             [onyx.schema :as os]))
