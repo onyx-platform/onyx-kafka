@@ -7,17 +7,18 @@
             [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [onyx api 
+            [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.kafka
              [embedded-server :as ke]
              [utils :refer [take-until-done]]]
-            [onyx.plugin kafka 
-             [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
+            [onyx.plugin kafka
+             [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
-            [onyx.tasks.kafka :refer [kafka-output]]))
+            [onyx.tasks
+             [kafka :refer [kafka-output]]
+             [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -33,7 +34,7 @@
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
-        (add-task (core-async/input-task :in batch-settings))
+        (add-task (core-async/input :in batch-settings))
         (add-task (kafka-output :write-messages
                                 (merge {:kafka/topic topic
                                         :kafka/zookeeper zk-address
@@ -47,7 +48,7 @@
                                                       {:profile :test})
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
-        {:keys [in]} (core-async/get-core-async-channels job)
+        {:keys [in]} (get-core-async-channels job)
         mock (atom {})
         test-data [{:key 1 :message {:n 0}} {:message {:n 1}}
                    {:key "tarein" :message {:n 2}} :done]]
