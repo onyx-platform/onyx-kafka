@@ -5,14 +5,15 @@
              [producer :as kp]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [onyx api 
+            [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.kafka.embedded-server :as ke]
-            [onyx.plugin kafka 
-             [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]]
-            [onyx.tasks.kafka :refer [kafka-input]]))
+            [onyx.plugin kafka
+             [core-async :refer [take-segments! get-core-async-channels]]]
+            [onyx.tasks
+             [kafka :refer [kafka-input]]
+             [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -38,7 +39,7 @@
                                        :onyx/min-peers 2
                                        :onyx/max-peers 2}
                                       batch-settings)))
-        (add-task (core-async/output-task :out batch-settings)))))
+        (add-task (core-async/output :out batch-settings)))))
 
 (defn mock-kafka
   "Use a custom version of mock-kafka as opposed to the one in test-utils
@@ -74,7 +75,7 @@
                                                       {:profile :test})
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
-        {:keys [out read-messages]} (core-async/get-core-async-channels job)
+        {:keys [out read-messages]} (get-core-async-channels job)
         mock (atom {})]
     (try
       (with-test-env [test-env [4 env-config peer-config]]

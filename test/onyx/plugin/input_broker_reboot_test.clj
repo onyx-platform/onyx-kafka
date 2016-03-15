@@ -3,14 +3,15 @@
             [clojure.core.async :refer [>!! chan]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [onyx api 
+            [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.plugin kafka 
-             [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
+            [onyx.plugin kafka
+             [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
-            [onyx.tasks.kafka :refer [kafka-input]]))
+            [onyx.tasks
+             [kafka :refer [kafka-input]]
+             [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -37,7 +38,7 @@
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))
-        (add-task (core-async/output-task :out batch-settings)))))
+        (add-task (core-async/output :out batch-settings)))))
 
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
@@ -48,7 +49,7 @@
                                                       {:profile :test})
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
-        {:keys [out read-messages]} (core-async/get-core-async-channels job)
+        {:keys [out read-messages]} (get-core-async-channels job)
         test-data1 [{:n 1}]
         test-data2 [{:n 2} {:n 3} {:n 4} {:n 5} {:n 6} :done]
         input-chan (chan 10)
