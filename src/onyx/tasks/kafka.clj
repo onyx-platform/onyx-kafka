@@ -35,7 +35,7 @@
               (s/optional-key :kafka/wrap-with-metadata?) s/Bool
               UserTaskMapKey s/Any}]))
 
-(s/defn ^:always-validate kafka-input
+(s/defn ^:always-validate consumer
   ([task-name :- s/Keyword opts]
    {:task {:task-map (merge {:onyx/name task-name
                              :onyx/plugin :onyx.plugin.kafka/read-messages
@@ -61,7 +61,7 @@
     force-reset? :- s/Bool
     deserializer-fn :- os/NamespacedKeyword
     task-opts :- {s/Any s/Any}]
-   (kafka-input task-name (merge {:kafka/topic topic
+   (consumer task-name (merge {:kafka/topic topic
                                   :kafka/partition partition
                                   :kafka/group-id group-id
                                   :kafka/zookeeper zookeeper
@@ -85,7 +85,7 @@
               :kafka/request-size s/Num
               UserTaskMapKey s/Any}]))
 
-(s/defn ^:always-validate kafka-output
+(s/defn ^:always-validate producer
   ([task-name :- s/Keyword opts]
    {:task {:task-map (merge {:onyx/name task-name
                              :onyx/plugin :onyx.plugin.kafka/write-messages
@@ -103,7 +103,7 @@
     serializer-fn :- os/NamespacedKeyword
     request-size :- s/Num
     task-opts :- {s/Any s/Any}]
-   (kafka-input task-name (merge {:kafka/topic topic
+   (consumer task-name (merge {:kafka/topic topic
                                   :kafka/zookeeper zookeeper
                                   :kafka/serializer-fn serializer-fn
                                   :kafka/request-size request-size}

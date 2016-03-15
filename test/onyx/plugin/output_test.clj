@@ -17,7 +17,7 @@
              [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
             [onyx.tasks
-             [kafka :refer [kafka-output]]
+             [kafka :refer [producer]]
              [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
@@ -35,7 +35,7 @@
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
         (add-task (core-async/input :in batch-settings))
-        (add-task (kafka-output :write-messages
+        (add-task (producer :write-messages
                                 (merge {:kafka/topic topic
                                         :kafka/zookeeper zk-address
                                         :kafka/serializer-fn :onyx.tasks.kafka/serialize-message-edn

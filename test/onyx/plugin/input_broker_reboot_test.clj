@@ -10,7 +10,7 @@
              [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
             [onyx.tasks
-             [kafka :refer [kafka-input]]
+             [kafka :refer [consumer]]
              [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
@@ -28,7 +28,7 @@
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
-        (add-task (kafka-input :read-messages
+        (add-task (consumer :read-messages
                                (merge {:kafka/topic topic
                                        :kafka/group-id "onyx-consumer"
                                        :kafka/zookeeper zk-address
