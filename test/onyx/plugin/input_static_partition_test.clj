@@ -35,7 +35,7 @@
                                        :onyx/min-peers 1
                                        :onyx/max-peers 1}
                                       batch-settings)))
-        (add-task (core-async/output-task :out batch-settings)))))
+        (add-task (core-async/output :out batch-settings)))))
 
 (deftest kafka-static-partition-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))

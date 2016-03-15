@@ -39,7 +39,7 @@
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))
-        (add-task (core-async/output-task :out batch-settings)))))
+        (add-task (core-async/output :out batch-settings)))))
 
 (def batch-num (atom 0))
 

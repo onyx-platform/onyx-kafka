@@ -33,7 +33,7 @@
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
-        (add-task (core-async/input-task :in batch-settings))
+        (add-task (core-async/input :in batch-settings))
         (add-task (kafka-output :write-messages
                                 (merge {:kafka/topic topic
                                         :kafka/zookeeper zk-address

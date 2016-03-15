@@ -38,7 +38,7 @@
                                        :onyx/min-peers 2
                                        :onyx/max-peers 2}
                                       batch-settings)))
-        (add-task (core-async/output-task :out batch-settings)))))
+        (add-task (core-async/output :out batch-settings)))))
 
 (defn mock-kafka
   "Use a custom version of mock-kafka as opposed to the one in test-utils
