@@ -54,7 +54,6 @@
              :lifecycles [os/Lifecycle]}})
   ([task-name :- s/Keyword
     topic :- s/Str
-    partition :- s/Str
     group-id :- s/Str
     zookeeper :- s/Str
     offset-reset :- (s/enum :smallest :largest)
@@ -62,13 +61,12 @@
     deserializer-fn :- os/NamespacedKeyword
     task-opts :- {s/Any s/Any}]
    (consumer task-name (merge {:kafka/topic topic
-                                  :kafka/partition partition
-                                  :kafka/group-id group-id
-                                  :kafka/zookeeper zookeeper
-                                  :kafka/offset-reset offset-reset
-                                  :kafka/force-reset? force-reset?
-                                  :kafka/deserializer-fn deserializer-fn}
-                                 task-opts))))
+                               :kafka/group-id group-id
+                               :kafka/zookeeper zookeeper
+                               :kafka/offset-reset offset-reset
+                               :kafka/force-reset? force-reset?
+                               :kafka/deserializer-fn deserializer-fn}
+                              task-opts))))
 
 ;;;; Writer task
 (defn serialize-message-json [segment]
@@ -104,7 +102,7 @@
     request-size :- s/Num
     task-opts :- {s/Any s/Any}]
    (consumer task-name (merge {:kafka/topic topic
-                                  :kafka/zookeeper zookeeper
-                                  :kafka/serializer-fn serializer-fn
-                                  :kafka/request-size request-size}
-                                 task-opts))))
+                               :kafka/zookeeper zookeeper
+                               :kafka/serializer-fn serializer-fn
+                               :kafka/request-size request-size}
+                              task-opts))))
