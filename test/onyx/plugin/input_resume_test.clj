@@ -6,7 +6,7 @@
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.plugin kafka 
-             [core-async :refer [take-segments!]]
+             [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
             [onyx.tasks.core-async :as core-async]
             [onyx.tasks.kafka :refer [kafka-input]]))
