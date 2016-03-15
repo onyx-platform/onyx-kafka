@@ -7,8 +7,8 @@
              [test-helper :refer [with-test-env]]]
             [onyx.plugin kafka 
              [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
              [test-utils :as test-utils]]
+            [onyx.tasks.core-async :as core-async]
             [onyx.tasks.kafka :refer [kafka-input]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]

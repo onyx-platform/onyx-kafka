@@ -15,8 +15,8 @@
              [utils :refer [take-until-done]]]
             [onyx.plugin kafka 
              [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
              [test-utils :as test-utils]]
+            [onyx.tasks.core-async :as core-async]
             [onyx.tasks.kafka :refer [kafka-output]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
