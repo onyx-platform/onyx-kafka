@@ -10,7 +10,7 @@
              [test-helper :refer [with-test-env]]]
             [onyx.kafka.embedded-server :as ke]
             [onyx.plugin kafka 
-             [core-async :refer [take-segments!]]]
+             [core-async :refer [take-segments! get-core-async-channels]]]
             [onyx.tasks.core-async :as core-async]
             [onyx.tasks.kafka :refer [kafka-input]]))
 
@@ -74,7 +74,7 @@
                                                       {:profile :test})
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
-        {:keys [out read-messages]} (core-async/get-core-async-channels job)
+        {:keys [out read-messages]} (get-core-async-channels job)
         mock (atom {})]
     (try
       (with-test-env [test-env [4 env-config peer-config]]
