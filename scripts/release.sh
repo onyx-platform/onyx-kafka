@@ -65,6 +65,10 @@ git tag $new_plugin_version
 git push origin $new_plugin_version
 git push origin master
 
+# Clean up.
+git reset --hard HEAD
+git clean -fd
+
 # Merge artifacts into release branch.
 git checkout -b $release_branch || git checkout $release_branch
 git pull origin $release_branch || true
