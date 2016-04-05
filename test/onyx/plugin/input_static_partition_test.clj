@@ -2,14 +2,15 @@
   (:require [aero.core :refer [read-config]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [onyx api 
+            [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.plugin kafka 
+            [onyx.plugin kafka
              [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
-            [onyx.tasks.core-async :as core-async]
-            [onyx.tasks.kafka :refer [kafka-input]]))
+            [onyx.tasks
+             [kafka :refer [consumer]]
+             [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -25,7 +26,7 @@
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
-        (add-task (kafka-input :read-messages
+        (add-task (consumer :read-messages
                                (merge {:kafka/topic topic
                                        :kafka/group-id "onyx-consumer"
                                        :kafka/zookeeper zk-address

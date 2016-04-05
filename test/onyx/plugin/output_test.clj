@@ -7,17 +7,18 @@
             [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [onyx api 
+            [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.kafka
              [embedded-server :as ke]
              [utils :refer [take-until-done]]]
-            [onyx.plugin kafka 
+            [onyx.plugin kafka
              [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
-            [onyx.tasks.core-async :as core-async]
-            [onyx.tasks.kafka :refer [kafka-output]]))
+            [onyx.tasks
+             [kafka :refer [producer]]
+             [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -34,7 +35,7 @@
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
         (add-task (core-async/input :in batch-settings))
-        (add-task (kafka-output :write-messages
+        (add-task (producer :write-messages
                                 (merge {:kafka/topic topic
                                         :kafka/zookeeper zk-address
                                         :kafka/serializer-fn :onyx.tasks.kafka/serialize-message-edn
