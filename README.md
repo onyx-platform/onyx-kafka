@@ -7,7 +7,7 @@ Onyx plugin providing read and write facilities for Kafka. This plugin automatic
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.9.0.0-beta2"]
+[org.onyxplatform/onyx-kafka "0.9.0.3-SNAPSHOT"]
 ```
 
 In your peer boot-up namespace:
@@ -48,7 +48,7 @@ Catalog entry:
  :kafka/empty-read-back-off 500
  :kafka/commit-interval 500
  :kafka/deserializer-fn :my.ns/deserializer-fn
- :kafak/wrap-with-metadata? false
+ :kafka/wrap-with-metadata? false
  :onyx/min-peers <<NUMBER-OF-PARTITIONS>>
  :onyx/max-peers <<NUMBER-OF-PARTITIONS>>
  :onyx/batch-size 100
