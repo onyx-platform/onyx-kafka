@@ -1,3 +1,6 @@
+# 0.9.0.2
+* Fixed typo in README
+
 # 0.8.7
 * Add :kafka/wrap-with-metadata? input task-map option.
 
