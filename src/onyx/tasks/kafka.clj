@@ -101,7 +101,7 @@
     serializer-fn :- os/NamespacedKeyword
     request-size :- s/Num
     task-opts :- {s/Any s/Any}]
-   (consumer task-name (merge {:kafka/topic topic
+   (producer task-name (merge {:kafka/topic topic
                                :kafka/zookeeper zookeeper
                                :kafka/serializer-fn serializer-fn
                                :kafka/request-size request-size}
