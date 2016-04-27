@@ -43,6 +43,9 @@
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
         zk-address (get-in peer-config [:zookeeper/address])
+        tenancy-id (str (java.util.UUID/randomUUID))
+        env-config (assoc env-config :onyx/tenancy-id tenancy-id)
+        peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         job (build-job zk-address test-topic 10 1000)
         {:keys [out read-messages]} (get-core-async-channels job)
         test-data [{:n 1} {:n 2} {:n 3} :done]
