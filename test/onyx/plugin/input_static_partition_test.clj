@@ -57,6 +57,6 @@
         (->> (onyx.api/submit-job peer-config job)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))
-        (is (= (onyx.plugin.core-async/take-segments! out)
-               test-data)))
+        (is (= test-data
+               (onyx.plugin.core-async/take-segments! out))))
       (finally (swap! mock component/stop)))))

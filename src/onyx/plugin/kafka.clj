@@ -306,7 +306,7 @@
   [event lifecycle]
   (.close (:kafka/producer event)))
 
-(defrecord KafkaWriteMessages [config topic producer serializer-fn]
+(defrecord KafkaWriteMessages [task-map config topic producer serializer-fn]
   p-ext/Pipeline
   (read-batch
     [_ event]
@@ -328,7 +328,9 @@
 
   (seal-resource
     [_ {:keys [onyx.core/results]}]
-    (send-sync! producer (ProducerRecord. topic nil nil (serializer-fn :done)))))
+    (if (:kafka/no-seal? task-map)
+      {}
+      (send-sync! producer (ProducerRecord. topic nil nil (serializer-fn :done))))))
 
 (defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
@@ -340,7 +342,7 @@
         value-serializer (byte-array-serializer)
         producer (producer/make-producer config key-serializer value-serializer)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))]
-    (->KafkaWriteMessages config topic producer serializer-fn)))
+    (->KafkaWriteMessages task-map config topic producer serializer-fn)))
 
 (defn read-handle-exception [event lifecycle lf-kw exception]
   :restart)
