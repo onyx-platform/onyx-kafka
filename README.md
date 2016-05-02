@@ -117,6 +117,7 @@ Segments supplied to a write-messages task should be in in the following form:
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
 |`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
 |`:kafka/request-size`       | `number`  |         | The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer.
+|`:kafka/no-seal?`           | `boolean` |`false`  | Do not write :done to the topic when task receives the sentinel signal (end of batch job)
 
 #### Test Utilities
 

@@ -81,6 +81,7 @@
               :kafka/zookeeper s/Str
               :kafka/serializer-fn os/NamespacedKeyword
               :kafka/request-size s/Num
+              (s/optional-key :kafka/no-seal?) s/Bool
               UserTaskMapKey s/Any}]))
 
 (s/defn ^:always-validate producer
