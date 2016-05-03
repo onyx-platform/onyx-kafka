@@ -37,15 +37,18 @@
      x)
     :none))
 
-(defn checkpoint-or-beginning [log consumer topic kpartition task-id]
-  (let [k (format "%s-%s-%s" task-id topic kpartition)]
+(defn checkpoint-name [group-id topic assigned-partition]
+  (format "%s-%s-%s" group-id topic assigned-partition))
+
+(defn checkpoint-or-beginning [log consumer topic kpartition group-id]
+  (let [k (checkpoint-name group-id topic kpartition)]
     (try
       (let [offset (inc (:offset (extensions/read-chunk log :chunk k)))]
         (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
       (catch org.apache.zookeeper.KeeperException$NoNodeException nne
         (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}])))))
 
-(defn seek-offset! [log consumer task-id topic kpartition task-map]
+(defn seek-offset! [log consumer group-id topic kpartition task-map]
   (if (:kafka/force-reset? task-map)
     (let [policy (:kafka/offset-reset task-map)]
       (cond (= policy :smallest)
@@ -56,7 +59,7 @@
 
             :else
             (throw (ex-info "Tried to seek to unknown policy" {:policy policy}))))
-    (checkpoint-or-beginning log consumer topic kpartition task-id)))
+    (checkpoint-or-beginning log consumer topic kpartition group-id)))
 
 (defn log-id [replica-val job-id peer-id task-id]
   (get-in replica-val [:task-slot-ids job-id task-id peer-id]))
@@ -125,7 +128,7 @@
               consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
               _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
 
-              _ (seek-offset! log consumer task-id topic kpartition task-map)
+              _ (seek-offset! log consumer group-id topic kpartition task-map)
               offset (cp/next-offset consumer {:topic topic :partition kpartition})
 
               empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
