@@ -94,12 +94,12 @@
        (last)
        (last)))
 
-(defn commit-loop [log task-id topic kpartition commit-interval pending-commits]
+(defn commit-loop [log group-id topic kpartition commit-interval pending-commits]
   (try
     (loop []
       (Thread/sleep commit-interval)
       (when-let [offset (highest-offset-to-commit @pending-commits)]
-        (let [k (format "%s-%s-%s" task-id topic kpartition)
+        (let [k (checkpoint-name group-id topic kpartition)
               data {:offset offset}]
           (extensions/force-write-chunk log :chunk data k)
           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))))
@@ -133,7 +133,7 @@
 
               empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
               commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-              commit-fut (future (commit-loop log task-id topic kpartition commit-interval pending-commits))
+              commit-fut (future (commit-loop log group-id topic kpartition commit-interval pending-commits))
               deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
               wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
               wrapper-fn (if wrap-message?
