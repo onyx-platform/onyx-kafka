@@ -1,6 +1,7 @@
 (ns onyx.tasks.kafka
   (:require [cheshire.core :as json]
             [schema.core :as s]
+            [onyx.job :refer [add-task]]
             [onyx.schema :as os]))
 
 ;;;; Reader task
@@ -16,24 +17,19 @@
     (catch Exception e
       {:error e})))
 
-(def UserTaskMapKey
-  (os/build-allowed-key-ns :kafka))
-
 (def KafkaInputTaskMap
-  (s/->Both [os/TaskMap
-             {:kafka/topic s/Str
-              :kafka/group-id s/Str
-              :kafka/zookeeper s/Str
-              :kafka/offset-reset (s/enum :smallest :largest)
-              :kafka/force-reset? s/Bool
-              :kafka/deserializer-fn os/NamespacedKeyword
-              (s/optional-key :kafka/partition) s/Str
-              (s/optional-key :kafka/chan-capacity) s/Num
-              (s/optional-key :kafka/fetch-size) s/Num
-              (s/optional-key :kafka/empty-read-back-off) s/Num
-              (s/optional-key :kafka/commit-interval) s/Num
-              (s/optional-key :kafka/wrap-with-metadata?) s/Bool
-              UserTaskMapKey s/Any}]))
+  {:kafka/topic s/Str
+   :kafka/group-id s/Str
+   :kafka/zookeeper s/Str
+   :kafka/offset-reset (s/enum :smallest :largest)
+   :kafka/force-reset? s/Bool
+   :kafka/deserializer-fn os/NamespacedKeyword
+   (s/optional-key :kafka/partition) s/Str
+   (s/optional-key :kafka/chan-capacity) s/Num
+   (s/optional-key :kafka/fetch-size) s/Num
+   (s/optional-key :kafka/empty-read-back-off) s/Num
+   (s/optional-key :kafka/commit-interval) s/Num
+   (s/optional-key :kafka/wrap-with-metadata?) s/Bool})
 
 (s/defn ^:always-validate consumer
   ([task-name :- s/Keyword opts]
@@ -50,8 +46,7 @@
                             opts)
            :lifecycles [{:lifecycle/task task-name
                          :lifecycle/calls :onyx.plugin.kafka/read-messages-calls}]}
-    :schema {:task-map KafkaInputTaskMap
-             :lifecycles [os/Lifecycle]}})
+    :schema {:task-map KafkaInputTaskMap}})
   ([task-name :- s/Keyword
     topic :- s/Str
     group-id :- s/Str
@@ -76,13 +71,11 @@
   (.getBytes (pr-str segment)))
 
 (def KafkaOutputTaskMap
-  (s/->Both [os/TaskMap
-             {:kafka/topic s/Str
-              :kafka/zookeeper s/Str
-              :kafka/serializer-fn os/NamespacedKeyword
-              :kafka/request-size s/Num
-              (s/optional-key :kafka/no-seal?) s/Bool
-              UserTaskMapKey s/Any}]))
+  {:kafka/topic s/Str
+   :kafka/zookeeper s/Str
+   :kafka/serializer-fn os/NamespacedKeyword
+   :kafka/request-size s/Num
+   (s/optional-key :kafka/no-seal?) s/Bool})
 
 (s/defn ^:always-validate producer
   ([task-name :- s/Keyword opts]
@@ -94,8 +87,7 @@
                             opts)
            :lifecycles [{:lifecycle/task task-name
                          :lifecycle/calls :onyx.plugin.kafka/write-messages-calls}]}
-    :schema {:task-map KafkaOutputTaskMap
-             :lifecycles [os/Lifecycle]}})
+    :schema {:task-map KafkaOutputTaskMap}})
   ([task-name :- s/Keyword
     topic :- s/Str
     zookeeper :- s/Str
