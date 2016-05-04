@@ -29,7 +29,8 @@
    (s/optional-key :kafka/fetch-size) s/Num
    (s/optional-key :kafka/empty-read-back-off) s/Num
    (s/optional-key :kafka/commit-interval) s/Num
-   (s/optional-key :kafka/wrap-with-metadata?) s/Bool})
+   (s/optional-key :kafka/wrap-with-metadata?) s/Bool
+   (os/restricted-ns :kafak) s/Any})
 
 (s/defn ^:always-validate consumer
   ([task-name :- s/Keyword opts]
@@ -75,7 +76,8 @@
    :kafka/zookeeper s/Str
    :kafka/serializer-fn os/NamespacedKeyword
    :kafka/request-size s/Num
-   (s/optional-key :kafka/no-seal?) s/Bool})
+   (s/optional-key :kafka/no-seal?) s/Bool
+   (os/restricted-ns :kafak) s/Any})
 
 (s/defn ^:always-validate producer
   ([task-name :- s/Keyword opts]
