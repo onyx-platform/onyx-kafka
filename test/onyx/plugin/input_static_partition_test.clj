@@ -54,7 +54,9 @@
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
         (reset! mock (test-utils/mock-kafka test-topic zk-address test-data))
-        (onyx.api/submit-job peer-config job)
+        (->> (onyx.api/submit-job peer-config job)
+             :job-id
+             (onyx.test-helper/feedback-exception! peer-config))
         (is (= (onyx.plugin.core-async/take-segments! out)
                test-data)))
       (finally (swap! mock component/stop)))))

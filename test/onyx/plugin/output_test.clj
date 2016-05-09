@@ -54,7 +54,9 @@
         (onyx.test-helper/validate-enough-peers! test-env job)
         (reset! mock (test-utils/mock-kafka test-topic zk-address []))
         (pipe (spool test-data) in) ;; Pipe data from test-data to the in channel
-        (onyx.api/submit-job peer-config job)
+        (->> (onyx.api/submit-job peer-config job)
+             :job-id
+             (onyx.test-helper/feedback-exception! peer-config))
         (is (= (->> (take-until-done zk-address test-topic (fn [v] (read-string (String. v "UTF-8"))))
                     (sort-by (comp :n :value))
                     (mapv (fn [msg]
