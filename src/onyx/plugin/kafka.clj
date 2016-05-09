@@ -146,11 +146,11 @@
                            (fn [_ value _] value))]
           _ (log/info (str "Kafka task: " task-id " allocated to partition: " kpartition ", starting at offset: " offset))
           (try
-            (loop [ms (seq (poll! consumer))]
+            (loop [msgs (seq (poll! consumer))]
               (when-not (Thread/interrupted)
-                (if ms
+                (if-not msgs
                   (Thread/sleep empty-read-back-off)
-                  (doseq [message ms]
+                  (doseq [message msgs]
                     (let [next-offset (:offset message)
                           dm (deserializer-fn (:value message))
                           wrapped (wrapper-fn message dm next-offset)]
