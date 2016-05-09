@@ -290,6 +290,8 @@
   [{:keys [kafka/read-ch] :as pipeline} lifecycle]
   (future-cancel (:kafka/reader-future pipeline))
   (close! read-ch)
+  ;; Drain read buffer to be safe, otherwise reader channel will stay blocked on put
+  (while (clojure.core.async/poll! read-ch))
   {})
 
 (defn inject-write-messages
