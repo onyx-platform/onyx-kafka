@@ -168,9 +168,8 @@
     (catch InterruptedException e
       (throw e))))
 
-(defn check-num-peers-equals-partitions [{:keys [onyx/min-peers onyx/max-peers
-                                                 kafka/partition] :as task-map} 
-                                         n-partitions]
+(defn check-num-peers-equals-partitions 
+  [{:keys [onyx/min-peers onyx/max-peers kafka/partition] :as task-map} n-partitions]
   (let [fixed-partition? (and partition (= 1 max-peers))
         all-partitions-covered? (= n-partitions min-peers max-peers)
         one-partition? (= 1 n-partitions max-peers)] 
