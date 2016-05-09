@@ -147,15 +147,16 @@
           _ (log/info (str "Kafka task: " task-id " allocated to partition: " kpartition ", starting at offset: " offset))
           (try
             (loop [ms (seq (poll! consumer))]
-              (if ms
-                (Thread/sleep empty-read-back-off)
-                (doseq [message ms]
-                  (let [next-offset (:offset message)
-                        dm (deserializer-fn (:value message))
-                        wrapped (wrapper-fn message dm next-offset)]
-                    (>!! ch (assoc (t/input (random-uuid) wrapped) 
-                                   :offset next-offset)))))
-                (recur (seq (poll! consumer))))
+              (when-not (Thread/interrupted)
+                (if ms
+                  (Thread/sleep empty-read-back-off)
+                  (doseq [message ms]
+                    (let [next-offset (:offset message)
+                          dm (deserializer-fn (:value message))
+                          wrapped (wrapper-fn message dm next-offset)]
+                      (>!! ch (assoc (t/input (random-uuid) wrapped) 
+                                     :offset next-offset)))))
+                (recur (seq (poll! consumer)))))
             (finally
               (future-cancel commit-fut))))
         (catch InterruptedException e
