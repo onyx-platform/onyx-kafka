@@ -103,7 +103,8 @@
               data {:offset offset}]
           (extensions/force-write-chunk log :chunk data k)
           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))))
-      (recur))
+      (when-not (Thread/interrupted) 
+        (recur)))
     (catch InterruptedException e
       (throw e))
     (catch Throwable e
