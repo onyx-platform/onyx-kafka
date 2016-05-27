@@ -50,11 +50,13 @@
         :else (throw (ex-info ":kafka/offset-reset must be either :smallest or :largest" {:task-map task-map}))))
 
 (defn starting-offset [m consumer topic kpartition group-id task-map]
-  (if (:kafka/force-reset? task-map)
-    (read-from-bound consumer topic kpartition task-map)
-    (if-let [x (kzk/committed-offset m group-id topic kpartition)]
-      (inc x)
-      (read-from-bound consumer topic kpartition task-map))))
+  (or
+   (if (:kafka/force-reset? task-map)
+     (read-from-bound consumer topic kpartition task-map)
+     (if-let [x (kzk/committed-offset m group-id topic kpartition)]
+       (inc x)
+       (read-from-bound consumer topic kpartition task-map)))
+   0))
 
 (defn highest-offset-to-commit [offsets]
   (->> (sort offsets)
