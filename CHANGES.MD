@@ -1,3 +1,6 @@
+#### 0.9.7.0
+* Defensively reduce chances of deadlock.
+
 # 0.9.0.2
 * Fixed typo in README
 
