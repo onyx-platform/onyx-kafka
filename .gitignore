@@ -10,3 +10,4 @@ pom.xml.asc
 data/
 onyx.log
 hs_err_pid*
+scripts/release-scripts
