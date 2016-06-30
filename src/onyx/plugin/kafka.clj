@@ -1,5 +1,5 @@
 (ns onyx.plugin.kafka
-  (:require [clojure.core.async :refer [chan >!! <!! close! timeout alts!! sliding-buffer]]
+  (:require [clojure.core.async :as a :refer [chan >!! <!! close! timeout alts!! sliding-buffer]]
             [franzy.admin.zookeeper.client :as k-admin]
             [franzy.admin.cluster :as k-cluster]
             [franzy.admin.partitions :as k-partitions]
@@ -195,6 +195,7 @@
         n-partitions (count partitions)
         _ (check-num-peers-equals-partitions task-map n-partitions)
         ch (:read-ch pipeline)
+        retry-ch (:retry-ch pipeline)
         pending-messages (:pending-messages pipeline)
         pending-commits (:pending-commits pipeline)
         job-id (:onyx.core/job-id event)
@@ -206,6 +207,7 @@
         done-unsupported? (and (> (count partitions) 1)
                                (not (:kafka/partition task-map)))]
     {:kafka/read-ch ch
+     :kafka/retry-ch ch
      :kafka/reader-future reader-fut
      :kafka/pending-messages pending-messages
      :kafka/pending-commits pending-commits
@@ -217,7 +219,7 @@
 
 (defrecord KafkaReadMessages
     [max-pending batch-size batch-timeout pending-messages
-     pending-commits drained? read-ch]
+     pending-commits drained? read-ch retry-ch]
   p-ext/Pipeline
   (write-batch
     [this event]
@@ -231,7 +233,7 @@
                   (<!! timeout-ch)
                   (->> (range max-segments)
                        (map (fn [_]
-                              (let [result (first (alts!! [read-ch timeout-ch] :priority true))]
+                              (let [result (first (alts!! [retry-ch read-ch timeout-ch] :priority true))]
                                 (if (= (:message result) :done)
                                   (t/input (random-uuid) :done)
                                   result))))
@@ -244,6 +246,7 @@
       (when (and (all-done? (vals @pending-messages))
                  (all-done? batch)
                  (zero? (count (.buf read-ch)))
+                 (zero? (count (.buf retry-ch)))
                  (or (not (empty? @pending-messages))
                      (not (empty? batch))))
         (if (:kafka/done-unsupported? event)
@@ -262,7 +265,7 @@
   (retry-segment
     [_ _ segment-id]
     (when-let [msg (get @pending-messages segment-id)]
-      (>!! read-ch (t/input (random-uuid) (:message msg)))
+      (>!! retry-ch (t/input (random-uuid) (:message msg)))
       (swap! pending-messages dissoc segment-id)))
 
   (pending?
@@ -280,19 +283,22 @@
         batch-timeout (arg-or-default :onyx/batch-timeout catalog-entry)
         chan-capacity (or (:kafka/chan-capacity catalog-entry) (:kafka/chan-capacity defaults))
         ch (chan chan-capacity)
+        retry-ch (chan (* 2 max-pending))
         pending-messages (atom {})
         pending-commits (atom (sorted-set))
         drained? (atom false)]
     (->KafkaReadMessages
      max-pending batch-size batch-timeout
-     pending-messages pending-commits drained? ch)))
+     pending-messages pending-commits drained? ch retry-ch)))
 
 (defn close-read-messages
-  [{:keys [kafka/read-ch] :as pipeline} lifecycle]
+  [{:keys [kafka/read-ch kafka/retry-ch] :as pipeline} lifecycle]
   (future-cancel (:kafka/reader-future pipeline))
   (close! read-ch)
   ;; Drain read buffer to be safe, otherwise reader channel will stay blocked on put
-  (while (clojure.core.async/poll! read-ch))
+  (while (a/poll! read-ch))
+  (close! retry-ch)
+  (while (a/poll! retry-ch))
   {})
 
 (defn inject-write-messages
