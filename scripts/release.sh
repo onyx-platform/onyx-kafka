@@ -15,6 +15,7 @@ then
 else
   cd $LOCAL_REPO
   git pull $REPO_SRC
+  cd ..
 fi
 
 bash "$LOCAL_REPO/release_plugin.sh" "$@"
