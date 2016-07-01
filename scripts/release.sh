@@ -5,6 +5,9 @@ set -o pipefail
 set -o nounset
 set -o xtrace
 
+# Make sure we're in onyx-kafka's directory first
+cd "$(dirname "$0")/.."
+
 REPO_SRC="https://github.com/onyx-platform/onyx-release-scripts.git"
 LOCAL_REPO="scripts/release-scripts"
 LOCAL_REPO_VC_DIR=$LOCAL_REPO/.git
