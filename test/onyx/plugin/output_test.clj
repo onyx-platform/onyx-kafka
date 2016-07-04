@@ -41,14 +41,18 @@
 
 (deftest kafka-output-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
+        other-test-topic (str "onyx-test-other-" (java.util.UUID/randomUUID))
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
         {:keys [in]} (get-core-async-channels job)
         mock (atom {})
-        test-data [{:key 1 :message {:n 0}} {:message {:n 1}}
-                   {:key "tarein" :message {:n 2}} :done]]
+        test-data [{:key 1 :message {:n 0}}
+                   {:message {:n 1}}
+                   {:key "tarein" :message {:n 2}}
+                   {:message {:n 3} :topic other-test-topic}
+                   :done]]
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
@@ -63,5 +67,9 @@
                             (select-keys msg [:key :value :partition]))))
                [{:key 1 :value {:n 0} :partition 0}
                 {:key nil :value {:n 1} :partition 0}
-                {:key "tarein" :value {:n 2} :partition 0}])))
+                {:key "tarein" :value {:n 2} :partition 0}]))
+        (is (= [{:key nil :value {:n 3} :partition 0 :topic "message-specific"}]
+               (take-until-done
+                zk-address other-test-topic
+                (fn [v] (read-string (String. v "UTF-8")))))))
       (finally (swap! mock component/stop)))))

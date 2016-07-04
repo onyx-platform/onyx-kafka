@@ -324,10 +324,13 @@
           send-futs (map (fn [m]
                            (let [k-message (:message m)
                                  k-key (some-> m :key serializer-fn)
-                                 p (some-> m :partition int)]
-                             (assert k-message
-                                     "Messages must be supplied in a map in form {:message :somevalue}, with optional :key and :partition keys.")
-                             (send-async! producer (ProducerRecord. topic p k-key (serializer-fn k-message)))))
+                                 p (some-> m :partition int)
+                                 message-topic (get m :topic topic)]
+                             (assert
+                              k-message
+                              (str "Payload missing required :message! Got "
+                                   (pr-str m)))
+                             (send-async! producer (ProducerRecord. message-topic p k-key (serializer-fn k-message)))))
                          (map :message messages))]
       (doall (map deref send-futs))
       {}))
