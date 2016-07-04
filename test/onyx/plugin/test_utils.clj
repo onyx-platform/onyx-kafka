@@ -21,7 +21,11 @@
    (k-topics/create-topic!
     (k-admin/make-zk-utils {:servers [zk-address]} false)
     topic-name
-    partitions)))
+    partitions
+    ;; Replication factor needs to be set because we're only running a single
+    ;; embedded Kafka server.
+    1
+    )))
 
 (defn mock-kafka
   "Starts a Kafka in-memory instance, preloading a topic with xs.
