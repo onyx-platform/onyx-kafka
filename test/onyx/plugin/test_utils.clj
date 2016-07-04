@@ -1,19 +1,27 @@
 (ns onyx.plugin.test-utils
-  (:require [clojure.core.async :refer [go-loop <!! chan <! >!]]
+  (:require [clojure.core.async :refer [<! go-loop]]
             [com.stuartsierra.component :as component]
-            [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.cluster :as k-cluster]
             [franzy.admin.topics :as k-topics]
-            [franzy.clients.producer.client :as producer]
-            [franzy.clients.producer.protocols :refer [send-sync!]]
+            [franzy.admin.zookeeper.client :as k-admin]
+            [franzy.clients.producer
+             [client :as producer]
+             [protocols :refer [send-sync!]]]
             [franzy.serialization.serializers :refer [byte-array-serializer]]
-            [franzy.serialization.deserializers :refer [byte-array-deserializer]]
-            [onyx.kafka.embedded-server :as ke])
-  (:import [franzy.clients.producer.types ProducerRecord]))
+            [onyx.kafka.embedded-server :as ke]
+            [schema.core :as s])
+  (:import franzy.clients.producer.types.ProducerRecord))
 
 ;; Set the log level, otherwise Kafka emits a huge amount
 ;; of messages.
 (.setLevel (org.apache.log4j.LogManager/getRootLogger) org.apache.log4j.Level/WARN)
+
+(s/defn create-topic
+  ([zk-address topic-name] (create-topic zk-address topic-name 1))
+  ([zk-address :- s/Str topic-name :- s/Str partitions :- s/Int]
+   (k-topics/create-topic!
+    (k-admin/make-zk-utils {:servers [zk-address]} false)
+    topic-name
+    partitions)))
 
 (defn mock-kafka
   "Starts a Kafka in-memory instance, preloading a topic with xs.
@@ -28,8 +36,7 @@
                                            :log.dir log-dir
                                            :zookeeper.connect zookeeper
                                            :controlled.shutdown.enable false}))
-         zk-utils (k-admin/make-zk-utils {:servers [zookeeper]} false)
-         _ (k-topics/create-topic! zk-utils topic 1)
+         _ (create-topic zookeeper topic)
          config {:bootstrap.servers ["127.0.0.1:9092"]}
          key-serializer (byte-array-serializer)
          value-serializer (byte-array-serializer)

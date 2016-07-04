@@ -57,6 +57,7 @@
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
         (reset! mock (test-utils/mock-kafka test-topic zk-address []))
+        (test-utils/create-topic zk-address other-test-topic)
         (pipe (spool test-data) in) ;; Pipe data from test-data to the in channel
         (->> (onyx.api/submit-job peer-config job)
              :job-id
