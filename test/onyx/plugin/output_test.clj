@@ -68,7 +68,7 @@
                [{:key 1 :value {:n 0} :partition 0}
                 {:key nil :value {:n 1} :partition 0}
                 {:key "tarein" :value {:n 2} :partition 0}]))
-        (is (= [{:key nil :value {:n 3} :partition 0 :topic "message-specific"}]
+        (is (= [{:key nil :value {:n 3} :partition 0 :topic other-test-topic}]
                (take-until-done
                 zk-address other-test-topic
                 (fn [v] (read-string (String. v "UTF-8")))))))
