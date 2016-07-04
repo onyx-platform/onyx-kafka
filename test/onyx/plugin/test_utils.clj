@@ -8,7 +8,8 @@
              [protocols :refer [send-sync!]]]
             [franzy.serialization.serializers :refer [byte-array-serializer]]
             [onyx.kafka.embedded-server :as ke]
-            [schema.core :as s])
+            [schema.core :as s]
+            [taoensso.timbre :as log])
   (:import franzy.clients.producer.types.ProducerRecord))
 
 ;; Set the log level, otherwise Kafka emits a huge amount
@@ -18,6 +19,10 @@
 (s/defn create-topic
   ([zk-address topic-name] (create-topic zk-address topic-name 1))
   ([zk-address :- s/Str topic-name :- s/Str partitions :- s/Int]
+   (log/info {:msg "Creating new topic"
+              :zk-address zk-address
+              :topic-name topic-name
+              :partitions partitions})
    (k-topics/create-topic!
     (k-admin/make-zk-utils {:servers [zk-address]} false)
     topic-name
