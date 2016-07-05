@@ -105,9 +105,16 @@ Lifecycle entry:
  :lifecycle/calls :onyx.plugin.kafka/write-messages-calls}
 ```
 
-Segments supplied to a write-messages task should be in in the following form:
-`{:message message-body}` with optional partition and key values e.g.
-`{:message message-body :key optional-key :partition optional-partition}`.
+Segments supplied to a `:onyx.plugin.kafka/write-messages` task should be in in
+the following form: `{:message message-body}` with optional partition, topic and
+key values.
+
+``` clj
+{:message message-body
+ :key optional-key
+ :partition optional-partition
+ :topic optional-topic}
+```
 
 ###### Attributes
 
