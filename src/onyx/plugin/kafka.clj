@@ -312,6 +312,25 @@
   [event lifecycle]
   (.close (:kafka/producer event)))
 
+(defn- message->producer-record
+  [{:keys [serializer-fn topic]} m]
+  (let [message (:message m)
+        k (some-> m :key serializer-fn)
+        p (some-> m :partition int)
+        message-topic (get m :topic topic)]
+    (cond
+      (nil? message)
+      (throw (ex-info "Payload is missing required :message!"
+                      {:payload m}))
+      (nil? message-topic)
+      (throw (ex-info
+              (str "Unable to write message payload to Kafka! "
+                   "Both :kafka/topic, and :topic in message payload "
+                   "are missing!")
+              {:payload m}))
+      :else
+      (ProducerRecord. message-topic p k (serializer-fn message)))))
+
 (defrecord KafkaWriteMessages [task-map config topic producer serializer-fn]
   p-ext/Pipeline
   (read-batch
@@ -319,17 +338,14 @@
     (function/read-batch event))
 
   (write-batch
-    [_ {:keys [onyx.core/results]}]
-    (let [messages (mapcat :leaves (:tree results))
-          send-futs (map (fn [m]
-                           (let [k-message (:message m)
-                                 k-key (some-> m :key serializer-fn)
-                                 p (some-> m :partition int)]
-                             (assert k-message
-                                     "Messages must be supplied in a map in form {:message :somevalue}, with optional :key and :partition keys.")
-                             (send-async! producer (ProducerRecord. topic p k-key (serializer-fn k-message)))))
-                         (map :message messages))]
-      (doall (map deref send-futs))
+    [this {:keys [onyx.core/results]}]
+    (let [messages (mapcat :leaves (:tree results))]
+      (doall
+       (->> messages
+            (map :message)
+            (map #(message->producer-record this %))
+            (map #(send-async! producer %))
+            (map deref)))
       {}))
 
   (seal-resource
