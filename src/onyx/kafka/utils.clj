@@ -42,7 +42,7 @@
        (loop [results []]
          (let [msgs (into [] (poll! c))
                segments
-               (map (partial consumer-record->message decompress-fn) msgs)]
+               (map #(consumer-record->message decompress-fn %) msgs)]
            (if (= :done (:value (last segments)))
              (into results (butlast segments))
              (recur (into results segments)))))))))
@@ -54,7 +54,7 @@
   (log/info {:msg "Taking now..." :topic topic})
   (let [c (make-consumer zk-addr)]
     (assign-partitions! c [{:topic topic :partition 0}])
-    (mapv (partial consumer-record->message decompress-fn) (poll! c))))
+    (mapv #(consumer-record->message decompress-fn %) (poll! c))))
 
 (defn take-segments
   "Reads segments from a topic until a :done is reached."

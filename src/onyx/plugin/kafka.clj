@@ -343,8 +343,8 @@
       (doall
        (->> messages
             (map :message)
-            (map (partial message->producer-record this))
-            (map (partial send-async! producer))
+            (map #(message->producer-record this %))
+            (map #(send-async! producer %))
             (map deref)))
       {}))
 
