@@ -72,7 +72,7 @@
   (.getBytes (pr-str segment)))
 
 (def KafkaOutputTaskMap
-  {:kafka/topic s/Str
+  {(s/optional-key :kafka/topic) s/Str
    :kafka/zookeeper s/Str
    :kafka/serializer-fn os/NamespacedKeyword
    :kafka/request-size s/Num

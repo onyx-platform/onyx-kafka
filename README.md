@@ -7,7 +7,7 @@ Onyx plugin providing read and write facilities for Kafka. This plugin automatic
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.9.7.0-beta2"]
+[org.onyxplatform/onyx-kafka "0.9.7.0"]
 ```
 
 In your peer boot-up namespace:
@@ -105,9 +105,16 @@ Lifecycle entry:
  :lifecycle/calls :onyx.plugin.kafka/write-messages-calls}
 ```
 
-Segments supplied to a write-messages task should be in in the following form:
-`{:message message-body}` with optional partition and key values e.g.
-`{:message message-body :key optional-key :partition optional-partition}`.
+Segments supplied to a `:onyx.plugin.kafka/write-messages` task should be in in
+the following form: `{:message message-body}` with optional partition, topic and
+key values.
+
+``` clj
+{:message message-body
+ :key optional-key
+ :partition optional-partition
+ :topic optional-topic}
+```
 
 ###### Attributes
 
