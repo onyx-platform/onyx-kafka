@@ -76,4 +76,26 @@
             {:doc "Do not write :done to the topic when task receives the sentinel signal (end of batch job)."
              :type :boolean
              :default false
-             :optional? true}}}})
+             :optional? true}}}
+
+   :task-bundles
+   {:kafka/read-messages
+    [:kafka/topic
+     :kafka/group-id
+     :kafka/zookeeper
+     :kafka/offset-reset
+     :kafka/force-reset?
+     :kafka/deserializer-fn
+     :kafka/partition
+     :kafka/chan-capacity
+     :kafka/fetch-size
+     :kafka/empty-read-back-off
+     :kafka/commit-interval
+     :kafka/wrap-with-metadata?]
+
+    :kafka/write-messages
+    [:kafka/topic
+     :kafka/zookeeper
+     :kafka/serializer-fn
+     :kafka/request-size
+     :kafka/no-seal?]}})
