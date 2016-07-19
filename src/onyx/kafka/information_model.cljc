@@ -98,11 +98,11 @@
    :lifecycle-entry
    {:kafka/read-messages
     {:model
-     {:lifecycle/calls :onyx.plugin.kafka/read-messages-calls}}
+     [{:lifecycle/calls :onyx.plugin.kafka/read-messages-calls}]}
 
     :kafka/write-messages
     {:model
-     {:lifecycle/calls :onyx.plugin.kafka/write-messages-calls}}}
+     [{:lifecycle/calls :onyx.plugin.kafka/write-messages-calls}]}}
 
    :display-order
    {:kafka/read-messages
