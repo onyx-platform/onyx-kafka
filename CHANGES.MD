@@ -1,3 +1,6 @@
+#### 0.9.9.0
+* *BREAKING CHANGE* Upgrade to use the new Kafka 0.9 client, deprecating the 0.8 client at [onyx-kafka-0.8](http://www.github.com/onyx-platform/onyx-kafka-0.8).
+
 #### 0.9.7.0
 * Defensively reduce chances of deadlock.
 
