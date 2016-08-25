@@ -2,7 +2,7 @@
 
 (def model
   {:catalog-entry
-   {:kafka/read-messages
+   {:onyx.plugin.kafka/read-messages
     {:summary "An input task to read messages from a Kafka topic."
      :model {:kafka/topic
              {:doc "The topic name to read from."
@@ -69,7 +69,7 @@
               :default 307200
               :optional? true}}}
 
-    :kafka/write-messages
+    :onyx.plugin.kafka/write-messages
     {:summary "Write messages to kafka."
      :model {:kafka/topic
              {:doc "The topic name to write to. Must either be supplied or otherwise all messages must contain a `:topic` key"
@@ -95,8 +95,17 @@
               :default false
               :optional? true}}}}
 
+   :lifecycle-entry
+   {:onyx.plugin.kafka/read-messages
+    {:model
+     [{:lifecycle/calls :onyx.plugin.kafka/read-messages-calls}]}
+
+    :onyx.plugin.kafka/write-messages
+    {:model
+     [{:lifecycle/calls :onyx.plugin.kafka/write-messages-calls}]}}
+
    :display-order
-   {:kafka/read-messages
+   {:onyx.plugin.kafka/read-messages
     [:kafka/topic
      :kafka/partition
      :kafka/group-id
@@ -111,7 +120,7 @@
      :kafka/commit-interval
      :kafka/wrap-with-metadata?]
 
-    :kafka/write-messages
+    :onyx.plugin.kafka/write-messages
     [:kafka/topic
      :kafka/zookeeper
      :kafka/partition
