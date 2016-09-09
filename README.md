@@ -9,7 +9,7 @@ This plugin version is *only compatible with Kafka 0.9+*. Please use [onyx-kafka
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.9.10.0-beta1"]
+[org.onyxplatform/onyx-kafka "0.9.10.0-beta2"]
 ```
 
 In your peer boot-up namespace:

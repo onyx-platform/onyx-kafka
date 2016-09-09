@@ -14,9 +14,9 @@
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.peer.operation :refer [kw->fn]]
             [onyx.peer.function :as function]
             [onyx.static.uuid :refer [random-uuid]]
+            [onyx.static.util :refer [kw->fn]]
             [onyx.extensions :as extensions]
             [onyx.types :as t]
             [onyx.api])
