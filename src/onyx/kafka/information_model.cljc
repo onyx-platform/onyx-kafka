@@ -45,6 +45,15 @@
              {:doc "The amount of time to back off between reads when nothing was fetched from a consumer."
               :type :long
               :default 500
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/empty-read-back-off deprecated in lieu of a :kafka/poll-timeout-ms"
+              :optional? true}
+
+             :kafka/poll-timeout-ms
+             {:doc "The amount of time to poll a kafka topic before timing out with an empty read"
+              :type :long
+              :default 500
+              :added "0.9.10.0"
               :optional? true}
 
              :kafka/commit-interval
@@ -116,6 +125,7 @@
      :kafka/chan-capacity
      :kafka/request-size
      :kafka/fetch-size
+     :kafka/poll-timeout-ms
      :kafka/empty-read-back-off
      :kafka/commit-interval
      :kafka/wrap-with-metadata?]
