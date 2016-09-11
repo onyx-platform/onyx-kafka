@@ -26,7 +26,7 @@
   {:kafka/fetch-size 307200
    :kafka/request-size 307200
    :kafka/chan-capacity 1000
-   :kafka/empty-read-back-off 500
+   :kafka/poll-timeout-ms 500
    :kafka/commit-interval 2000
    :kafka/wrap-with-metadata? false})
 
@@ -132,7 +132,7 @@
               _ (seek-offset! log consumer group-id topic kpartition task-map)
               offset (cp/next-offset consumer {:topic topic :partition kpartition})
 
-              empty-read-back-off (or (:kafka/empty-read-back-off task-map) (:kafka/empty-read-back-off defaults))
+              poll-timeout-ms (or (:kafka/poll-timeout-ms task-map) (:kafka/poll-timeout-ms defaults))
               commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
               commit-fut (future (commit-loop log group-id topic kpartition commit-interval pending-commits))
               deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
@@ -147,17 +147,16 @@
                            (fn [_ value _] value))]
           _ (log/info (str "Kafka task: " task-id " allocated to partition: " kpartition ", starting at offset: " offset))
           (try
-            (loop [msgs (seq (poll! consumer))]
+            (loop [msgs (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms}))]
               (when-not (Thread/interrupted)
-                (if-not msgs
-                  (Thread/sleep empty-read-back-off)
+                (when msgs
                   (doseq [message msgs]
                     (let [next-offset (:offset message)
                           dm (deserializer-fn (:value message))
                           wrapped (wrapper-fn message dm next-offset)]
                       (>!! ch (assoc (t/input (random-uuid) wrapped) 
                                      :offset next-offset)))))
-                (recur (seq (poll! consumer)))))
+                (recur (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms})))))
             (finally
               (future-cancel commit-fut))))
         (catch InterruptedException e
