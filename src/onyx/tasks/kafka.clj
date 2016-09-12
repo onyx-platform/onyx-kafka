@@ -27,6 +27,7 @@
    (s/optional-key :kafka/partition) s/Str
    (s/optional-key :kafka/chan-capacity) s/Num
    (s/optional-key :kafka/fetch-size) s/Num
+   (s/optional-key :kafka/request-size) s/Num
    (s/optional-key :kafka/poll-timeout-ms) s/Num
    (s/optional-key :kafka/commit-interval) s/Num
    (s/optional-key :kafka/wrap-with-metadata?) s/Bool
