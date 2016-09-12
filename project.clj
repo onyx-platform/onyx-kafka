@@ -25,4 +25,20 @@
   :profiles {:dev {:plugins [[lein-set-version "0.4.1"]
                              [lein-update-dependency "0.1.2"]
                              [lein-pprint "1.1.1"]]}
+             :bench {:global-vars  {*warn-on-reflection* true
+                                    *assert* false
+                                    *unchecked-math* :warn-on-boxed}
+                     :java-opts ^:replace ["-server"
+                                           "-Xmx6g"
+                                           "-XX:BiasedLockingStartupDelay=0"
+                                           "-Daeron.mtu.length=16384"
+                                           "-Daeron.socket.so_sndbuf=2097152"
+                                           "-Daeron.socket.so_rcvbuf=2097152"
+                                           "-Daeron.rcv.buffer.length=16384"
+                                           "-Daeron.rcv.initial.window.length=2097152"
+                                           "-Dagrona.disable.bounds.checks=true"
+                                           "-XX:+UnlockCommercialFeatures" 
+                                           "-XX:+FlightRecorder"
+                                           "-XX:+UnlockDiagnosticVMOptions"
+                                           "-XX:StartFlightRecording=duration=1080s,filename=localrecording.jfr"]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}})

@@ -8,6 +8,7 @@
             [franzy.clients.producer.client :as producer]
             [franzy.clients.producer.protocols :refer [send-async! send-sync!]]
             [franzy.clients.producer.types :refer [make-producer-record]]
+            [franzy.clients.consumer.protocols :as proto]
             [franzy.clients.consumer.client :as consumer]
             [franzy.clients.consumer.protocols :refer [assign-partitions! commit-offsets-sync!
                                                        poll! seek-to-offset!] :as cp]
@@ -20,7 +21,10 @@
             [onyx.extensions :as extensions]
             [onyx.types :as t]
             [onyx.api])
-  (:import [franzy.clients.producer.types ProducerRecord]))
+  (:import (org.apache.kafka.clients.consumer ConsumerRecords)
+           (org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer)
+           [franzy.clients.producer.types ProducerRecord]
+           [clojure.core.async.impl.channels ManyToManyChannel]))
 
 (def defaults
   {:kafka/fetch-size 307200
@@ -147,16 +151,16 @@
                            (fn [_ value _] value))]
           _ (log/info (str "Kafka task: " task-id " allocated to partition: " kpartition ", starting at offset: " offset))
           (try
-            (loop [msgs (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms}))]
-              (when-not (Thread/interrupted)
-                (when msgs
-                  (doseq [message msgs]
-                    (let [next-offset (:offset message)
-                          dm (deserializer-fn (:value message))
-                          wrapped (wrapper-fn message dm next-offset)]
-                      (>!! ch (assoc (t/input (random-uuid) wrapped) 
-                                     :offset next-offset)))))
-                (recur (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms})))))
+           (loop [msgs (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms}))]
+             (when-not (Thread/interrupted)
+               (when msgs
+                 (doseq [message msgs]
+                   (let [next-offset (:offset message)
+                         dm (deserializer-fn (:value message))
+                         wrapped (wrapper-fn message dm next-offset)]
+                     (>!! ch (assoc (t/input (random-uuid) wrapped) 
+                                    :offset next-offset)))))
+               (recur (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms})))))
             (finally
               (future-cancel commit-fut))))
         (catch InterruptedException e
@@ -215,8 +219,9 @@
      :kafka/done-unsupported? done-unsupported?}))
 
 (defn all-done? [messages]
-  (empty? (remove #(= :done (:message %))
-                  messages)))
+  (empty? 
+   (remove #(= :done (:message %))
+           messages)))
 
 (defrecord KafkaReadMessages
     [max-pending batch-size batch-timeout pending-messages
@@ -227,18 +232,17 @@
     (function/write-batch event))
 
   (read-batch [_ event]
-    (let [pending (count (keys @pending-messages))
+    (let [pending (count @pending-messages)
           max-segments (min (- max-pending pending) batch-size)
           timeout-ch (timeout batch-timeout)
           batch (if (zero? max-segments) 
                   (<!! timeout-ch)
                   (->> (range max-segments)
-                       (map (fn [_]
-                              (let [result (first (alts!! [retry-ch read-ch timeout-ch] :priority true))]
-                                (if (= (:message result) :done)
-                                  (t/input (random-uuid) :done)
-                                  result))))
-                       (filter :message)))]
+                       (keep (fn [_]
+                               (let [result (first (alts!! [retry-ch read-ch timeout-ch] :priority true))]
+                                 (if (= (:message result) :done)
+                                   (t/input (random-uuid) :done)
+                                   result))))))]
       (doseq [m batch]
         (when (instance? java.lang.Throwable (:message m))
           (throw (:message m)))
@@ -246,8 +250,8 @@
         (swap! pending-messages assoc (:id m) m))
       (when (and (all-done? (vals @pending-messages))
                  (all-done? batch)
-                 (zero? (count (.buf read-ch)))
-                 (zero? (count (.buf retry-ch)))
+                 (zero? (count (.buf ^ManyToManyChannel read-ch)))
+                 (zero? (count (.buf ^ManyToManyChannel retry-ch)))
                  (or (not (empty? @pending-messages))
                      (not (empty? batch))))
         (if (:kafka/done-unsupported? event)
