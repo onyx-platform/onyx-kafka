@@ -1,5 +1,5 @@
 (ns onyx.plugin.kafka
-  (:require [clojure.core.async :as a :refer [chan >!! <!! close! timeout alts!! sliding-buffer]]
+  (:require [clojure.core.async :as a :refer [chan >!! <!! close! timeout sliding-buffer]]
             [franzy.admin.zookeeper.client :as k-admin]
             [franzy.admin.cluster :as k-cluster]
             [franzy.admin.partitions :as k-partitions]
@@ -13,6 +13,7 @@
             [franzy.clients.consumer.protocols :refer [assign-partitions! commit-offsets-sync!
                                                        poll! seek-to-offset!] :as cp]
             [taoensso.timbre :as log :refer [fatal info]]
+            [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.peer.function :as function]
@@ -21,16 +22,16 @@
             [onyx.extensions :as extensions]
             [onyx.types :as t]
             [onyx.api])
-  (:import (org.apache.kafka.clients.consumer ConsumerRecords)
+  (:import (org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord)
            (org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer)
+           (franzy.clients.consumer.client FranzConsumer)
            [franzy.clients.producer.types ProducerRecord]
+           [org.apache.kafka.common TopicPartition]
            [clojure.core.async.impl.channels ManyToManyChannel]))
 
 (def defaults
   {:kafka/fetch-size 307200
    :kafka/request-size 307200
-   :kafka/chan-capacity 1000
-   :kafka/poll-timeout-ms 500
    :kafka/commit-interval 2000
    :kafka/wrap-with-metadata? false})
 
@@ -112,64 +113,7 @@
     (catch InterruptedException e
       (throw e))
     (catch Throwable e
-      (fatal e))))
-
-(defn reader-loop [client-id group-id topic static-partition partitions task-map 
-                   replica job-id peer-id task-id ch pending-commits log]
-  (try
-    (loop []
-      (try
-        (let [kpartition (if static-partition
-                           (Integer/parseInt (str static-partition))
-                           (log-id @replica job-id peer-id task-id))
-              consumer-config {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
-                               :group.id group-id
-                               :enable.auto.commit false
-                               :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
-
-              key-deserializer (byte-array-deserializer)
-              value-deserializer (byte-array-deserializer)
-
-              consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
-              _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
-
-              _ (seek-offset! log consumer group-id topic kpartition task-map)
-              offset (cp/next-offset consumer {:topic topic :partition kpartition})
-
-              poll-timeout-ms (or (:kafka/poll-timeout-ms task-map) (:kafka/poll-timeout-ms defaults))
-              commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-              commit-fut (future (commit-loop log group-id topic kpartition commit-interval pending-commits))
-              deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
-              wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
-              wrapper-fn (if wrap-message?
-                           (fn [kafka-message value off] 
-                             {:offset off 
-                              :message value 
-                              :topic (:topic kafka-message)
-                              :partition (:partition kafka-message)
-                              :key (:key kafka-message)})
-                           (fn [_ value _] value))]
-          _ (log/info (str "Kafka task: " task-id " allocated to partition: " kpartition ", starting at offset: " offset))
-          (try
-           (loop [msgs (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms}))]
-             (when-not (Thread/interrupted)
-               (when msgs
-                 (doseq [message msgs]
-                   (let [next-offset (:offset message)
-                         dm (deserializer-fn (:value message))
-                         wrapped (wrapper-fn message dm next-offset)]
-                     (>!! ch (assoc (t/input (random-uuid) wrapped) 
-                                    :offset next-offset)))))
-               (recur (seq (poll! consumer {:poll-timeout-ms poll-timeout-ms})))))
-            (finally
-              (future-cancel commit-fut))))
-        (catch InterruptedException e
-          (throw e))
-        (catch Throwable e
-          ;; pass exception back to reader thread
-          (>!! ch (t/input (random-uuid) e)))))
-    (catch InterruptedException e
-      (throw e))))
+      (fatal e)))) 
 
 (defn check-num-peers-equals-partitions 
   [{:keys [onyx/min-peers onyx/max-peers onyx/n-peers kafka/partition] :as task-map} n-partitions]
@@ -188,7 +132,7 @@
         (throw e)))))
 
 (defn start-kafka-consumer
-  [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/log] :as event} lifecycle]
+  [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/log onyx.core/replica] :as event} lifecycle]
   (let [{:keys [kafka/topic kafka/partition kafka/group-id]} task-map
         brokers (find-brokers (:kafka/zookeeper task-map))
         consumer-config {:bootstrap.servers brokers
@@ -199,21 +143,35 @@
         partitions (first (vals (k-partitions/partitions-for zk-utils [topic])))
         n-partitions (count partitions)
         _ (check-num-peers-equals-partitions task-map n-partitions)
-        ch (:read-ch pipeline)
         retry-ch (:retry-ch pipeline)
         pending-messages (:pending-messages pipeline)
         pending-commits (:pending-commits pipeline)
         job-id (:onyx.core/job-id event)
         peer-id (:onyx.core/id event)
         task-id (:onyx.core/task-id event)
-        reader-fut (future (reader-loop client-id group-id topic partition partitions task-map 
-                                        (:onyx.core/replica event) job-id peer-id task-id
-                                        ch pending-commits log))
         done-unsupported? (and (> (count partitions) 1)
-                               (not (:kafka/partition task-map)))]
-    {:kafka/read-ch ch
-     :kafka/retry-ch ch
-     :kafka/reader-future reader-fut
+                               (not (:kafka/partition task-map)))
+        kpartition (if partition
+                     (Integer/parseInt (str partition))
+                     (log-id @replica job-id peer-id task-id))
+        consumer-config {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
+                         :group.id group-id
+                         :enable.auto.commit false
+                         :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
+        key-deserializer (byte-array-deserializer)
+        value-deserializer (byte-array-deserializer)
+
+        consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
+        _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
+
+        _ (seek-offset! log consumer group-id topic kpartition task-map)
+        offset (cp/next-offset consumer {:topic topic :partition kpartition})
+        poll-timeout-ms (or (:kafka/poll-timeout-ms task-map) (:kafka/poll-timeout-ms defaults))
+        commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
+        commit-fut (future (commit-loop log group-id topic kpartition commit-interval pending-commits))]
+    {:kafka/commit-fut commit-fut
+     :kafka/retry-ch retry-ch
+     :kafka/consumer consumer
      :kafka/pending-messages pending-messages
      :kafka/pending-commits pending-commits
      :kafka/done-unsupported? done-unsupported?}))
@@ -223,9 +181,31 @@
    (remove #(= :done (:message %))
            messages)))
 
+(defn take-values! [batch ch n-messages]
+  (loop [n 0]
+    (if-let [v (if (< n n-messages)
+                   (a/poll! ch))]
+      (do (conj! batch v)
+          (recur (inc n)))
+      n)))
+
+(defn add-pending-batch [pending-messages batch]
+  (persistent! 
+   (reduce (fn [p m]
+             (assoc! p (:id m) m))
+           (transient pending-messages) 
+           batch)))
+
+(defn take-records! [batch ^java.util.Iterator iterator segment-fn n-messages]
+  (loop [n n-messages]
+    (if (and (.hasNext iterator)
+             (pos? n))
+      (do 
+       (conj! batch (segment-fn (.next iterator)))
+       (recur (dec n))))))
+
 (defrecord KafkaReadMessages
-    [max-pending batch-size batch-timeout pending-messages
-     pending-commits drained? read-ch retry-ch]
+  [max-pending batch-size batch-timeout pending-messages pending-commits drained? iter retry-ch segment-fn]
   p-ext/Pipeline
   (write-batch
     [this event]
@@ -233,30 +213,24 @@
 
   (read-batch [_ event]
     (let [pending (count @pending-messages)
-          max-segments (min (- max-pending pending) batch-size)
-          timeout-ch (timeout batch-timeout)
-          batch (if (zero? max-segments) 
-                  (<!! timeout-ch)
-                  (->> (range max-segments)
-                       (keep (fn [_]
-                               (let [result (first (alts!! [retry-ch read-ch timeout-ch] :priority true))]
-                                 (if (= (:message result) :done)
-                                   (t/input (random-uuid) :done)
-                                   result))))))]
-      (doseq [m batch]
-        (when (instance? java.lang.Throwable (:message m))
-          (throw (:message m)))
-
-        (swap! pending-messages assoc (:id m) m))
-      (when (and (all-done? (vals @pending-messages))
-                 (all-done? batch)
-                 (zero? (count (.buf ^ManyToManyChannel read-ch)))
+          max-segments (max (min (- max-pending pending) batch-size) 0)
+          _ (when (and (not (zero? max-segments)) 
+                       (or (nil? @iter)
+                           (not (.hasNext ^java.util.Iterator @iter))))
+              (reset! iter (.iterator ^ConsumerRecords (.poll ^Consumer (.consumer ^FranzConsumer (:kafka/consumer event)) batch-timeout))))
+          batch (transient [])
+          n-retries (take-values! batch retry-ch batch-size)
+          _ (take-records! batch @iter segment-fn (- max-segments n-retries))
+          batch (persistent! batch)]
+      (swap! pending-messages add-pending-batch batch)
+      (when (and (all-done? batch)
+                 (all-done? (vals @pending-messages))
                  (zero? (count (.buf ^ManyToManyChannel retry-ch)))
                  (or (not (empty? @pending-messages))
                      (not (empty? batch))))
         (if (:kafka/done-unsupported? event)
           (throw (UnsupportedOperationException. ":done is not supported for auto assigned kafka partitions. 
-                                                 (:kafka/partition must be supplied)"))
+                                                  (:kafka/partition must be supplied)"))
           (reset! drained? true)))
       {:onyx.core/batch batch}))
 
@@ -282,26 +256,37 @@
     @drained?))
 
 (defn read-messages [pipeline-data]
-  (let [catalog-entry (:onyx.core/task-map pipeline-data)
-        max-pending (arg-or-default :onyx/max-pending catalog-entry)
-        batch-size (:onyx/batch-size catalog-entry)
-        batch-timeout (arg-or-default :onyx/batch-timeout catalog-entry)
-        chan-capacity (or (:kafka/chan-capacity catalog-entry) (:kafka/chan-capacity defaults))
-        ch (chan chan-capacity)
+  (let [task-map (:onyx.core/task-map pipeline-data)
+        max-pending (arg-or-default :onyx/max-pending task-map)
+        batch-size (:onyx/batch-size task-map)
+        batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         retry-ch (chan (* 2 max-pending))
         pending-messages (atom {})
         pending-commits (atom (sorted-set))
-        drained? (atom false)]
-    (->KafkaReadMessages
-     max-pending batch-size batch-timeout
-     pending-messages pending-commits drained? ch retry-ch)))
+        drained? (atom false)
+        wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
+        deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
+        segment-fn (if wrap-message?
+                     (fn [^ConsumerRecord cr]
+                       (assoc (t/input (random-uuid)
+                                       {:topic (.topic cr)
+                                        :partition (.partition cr)
+                                        :key (.key cr)
+                                        :message (deserializer-fn (.value cr))
+                                        :offset (.offset cr)})
+                              :offset (.offset cr)))
+                     (fn [^ConsumerRecord cr]
+                       (assoc (t/input (random-uuid) 
+                                       (deserializer-fn (.value cr)))
+                              :offset (.offset cr))))
+        buffered-segments (atom nil)]
+    (->KafkaReadMessages max-pending batch-size batch-timeout
+                         pending-messages pending-commits drained? buffered-segments retry-ch segment-fn)))
 
 (defn close-read-messages
-  [{:keys [kafka/read-ch kafka/retry-ch] :as pipeline} lifecycle]
-  (future-cancel (:kafka/reader-future pipeline))
-  (close! read-ch)
-  ;; Drain read buffer to be safe, otherwise reader channel will stay blocked on put
-  (while (a/poll! read-ch))
+  [{:keys [kafka/retry-ch kafka/commit-fut kafka/consumer] :as pipeline} lifecycle]
+  (future-cancel commit-fut)
+  (.close consumer)
   (close! retry-ch)
   (while (a/poll! retry-ch))
   {})
@@ -347,10 +332,9 @@
     (let [messages (mapcat :leaves (:tree results))]
       (doall
        (->> messages
-            (map :message)
-            (map #(message->producer-record this %))
-            (map #(send-async! producer %))
-            (map deref)))
+            (map (fn [msg]
+                   (send-async! producer (message->producer-record this (:message msg)))))
+            (run! deref)))
       {}))
 
   (seal-resource

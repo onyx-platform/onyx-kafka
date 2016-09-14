@@ -43,14 +43,13 @@ Catalog entry:
  :kafka/topic "my topic"
  :kafka/group-id "onyx-consumer"
  :kafka/fetch-size 307200
- :kafka/chan-capacity 1000
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/offset-reset :smallest
  :kafka/force-reset? true
- :kafka/empty-read-back-off 500
  :kafka/commit-interval 500
  :kafka/deserializer-fn :my.ns/deserializer-fn
  :kafka/wrap-with-metadata? false
+ :onyx/batch-timeout 50
  :onyx/min-peers <<NUMBER-OF-PARTITIONS>>
  :onyx/max-peers <<NUMBER-OF-PARTITIONS>>
  :onyx/batch-size 100
