@@ -33,18 +33,30 @@
              {:doc "The buffer size of the Kafka reading channel."
               :type :long
               :default 1000
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/chan-capacity deprecated as onyx-kafka no longer uses a separate producer thread."
+              :optional? true}
+
+             :kafka/receive-buffer-bytes
+             {:doc "The size in the receive buffer in the Kafka consumer."
+              :type :long
+              :default 65536
               :optional? true}
 
              :kafka/fetch-size
              {:doc "The size in bytes to request from ZooKeeper per fetch request."
               :type :long
               :default 307200
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/fetch-size deprecated. Use :kafka/receive-buffer-bytes instead."
               :optional? true}
 
              :kafka/empty-read-back-off
              {:doc "The amount of time to back off between reads when nothing was fetched from a consumer."
               :type :long
               :default 500
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/empty-read-back-off deprecated in lieu of better use of :onyx/batch-timeout"
               :optional? true}
 
              :kafka/commit-interval
@@ -61,12 +73,6 @@
              {:doc "Wraps message into map with keys `:offset`, `:partitions`, `:topic` and `:message` itself."
               :type :boolean
               :default false
-              :optional? true}
-
-             :kafka/request-size
-             {:doc "The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer."
-              :type :long
-              :default 307200
               :optional? true}}}
 
     :onyx.plugin.kafka/write-messages
@@ -84,6 +90,11 @@
              :kafka/zookeeper
              {:doc "The ZooKeeper connection string."
               :type :string}
+
+             :kafka/request-size
+             {:doc "The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer."
+              :type :long
+              :optional? true}
 
              :kafka/serializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment."
@@ -115,16 +126,17 @@
      :kafka/offset-reset
      :kafka/force-reset?
      :kafka/deserializer-fn
-     :kafka/chan-capacity
-     :kafka/request-size
-     :kafka/fetch-size
-     :kafka/empty-read-back-off
+     :kafka/receive-buffer-bytes
      :kafka/commit-interval
-     :kafka/wrap-with-metadata?]
+     :kafka/wrap-with-metadata?
+     :kafka/empty-read-back-off
+     :kafka/fetch-size
+     :kafka/chan-capacity]
 
     :onyx.plugin.kafka/write-messages
     [:kafka/topic
      :kafka/zookeeper
      :kafka/partition
      :kafka/serializer-fn
+     :kafka/request-size
      :kafka/no-seal?]}})

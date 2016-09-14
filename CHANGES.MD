@@ -1,3 +1,12 @@
+
+#### 0.9.10.0
+* **BREAKING CHANGE* `:kafka/chan-capacity` has been removed as there is no longer a separate reader thread producing messages
+* **BREAKING CHANGE* `:kafka/empty-read-back-off` has been removed as there is no longer a separate reader thread producing messages. Tweak `:onyx/batch-timeout` instead, as this will change the kafka consumer poll time.
+* **BREAKING CHANGE* `:kafka/fetch-size` deprecated. Use `:kafka/receive-buffer-bytes`.
+* Large performance improvements were made.
+* Moved franzy-admin and franzy-embedded server dependencies to dev dependencies to reduce dependency bloat
+* Temporary change all franzy dependencies to lbradstreet/franzy-*. Please ensure you are not using ymilky/franzy-* in your project dependencies for the time being.
+
 #### 0.9.9.0
 * *BREAKING CHANGE* Upgrade to use the new Kafka 0.9 client, deprecating the 0.8 client at [onyx-kafka-0.8](http://www.github.com/onyx-platform/onyx-kafka-0.8).
 

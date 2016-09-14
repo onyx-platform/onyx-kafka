@@ -33,7 +33,6 @@
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :smallest
                                        :kafka/force-reset? false
-                                       :kafka/empty-read-back-off 500
                                        :kafka/commit-interval 500
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                        :onyx/max-peers 1
