@@ -44,7 +44,7 @@
   (nip/thaw x decompress-opts))
 
 (def messages-per-partition 2000000)
-(def n-partitions 2)
+(def n-partitions 1)
 
 (defn print-message [segment]
   segment
@@ -77,11 +77,10 @@
                              :kafka/zookeeper zk-address
                              :kafka/offset-reset :smallest
                              :kafka/force-reset? true
+                             :kafka/receive-buffer-bytes 65536
                              :kafka/deserializer-fn ::decompress
                              :onyx/fn ::print-message
-                             :kafka/fetch-size 307200
-                             :kafka/request-size 307200
-                             :onyx/batch-timeout 50
+                             :onyx/batch-timeout 500
                              :onyx/batch-size batch-size
                              :onyx/max-pending 10000
                              :onyx/min-peers n-partitions

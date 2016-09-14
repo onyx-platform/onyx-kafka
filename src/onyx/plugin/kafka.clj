@@ -30,9 +30,7 @@
            [clojure.core.async.impl.channels ManyToManyChannel]))
 
 (def defaults
-  {:kafka/fetch-size 307200
-   :kafka/request-size 307200
-   :kafka/commit-interval 2000
+  {:kafka/receive-buffer-bytes 65536
    :kafka/wrap-with-metadata? false})
 
 (defn get-offset-reset [task-map x]
@@ -157,13 +155,13 @@
         consumer-config {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
                          :group.id group-id
                          :enable.auto.commit false
+                         :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
+                                                   (:kafka/receive-buffer-bytes defaults))
                          :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
         key-deserializer (byte-array-deserializer)
         value-deserializer (byte-array-deserializer)
-
         consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
         _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
-
         _ (seek-offset! log consumer group-id topic kpartition task-map)
         offset (cp/next-offset consumer {:topic topic :partition kpartition})
         poll-timeout-ms (or (:kafka/poll-timeout-ms task-map) (:kafka/poll-timeout-ms defaults))

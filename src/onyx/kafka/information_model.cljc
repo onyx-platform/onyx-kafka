@@ -37,10 +37,18 @@
               :deprecation-doc ":kafka/chan-capacity deprecated as onyx-kafka no longer uses a separate producer thread."
               :optional? true}
 
+             :kafka/receive-buffer-bytes
+             {:doc "The size in bytes to request from Kafka per fetch request."
+              :type :long
+              :default 65536
+              :optional? true}
+
              :kafka/fetch-size
              {:doc "The size in bytes to request from ZooKeeper per fetch request."
               :type :long
               :default 307200
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/fetch-size deprecated. Use :kafka/receive-buffer-bytes instead."
               :optional? true}
 
              :kafka/empty-read-back-off
@@ -70,7 +78,8 @@
              :kafka/request-size
              {:doc "The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer."
               :type :long
-              :default 307200
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/request-size deprecated as it is not respected by the consumer. Use :kafka/receive-buffer-bytes"
               :optional? true}}}
 
     :onyx.plugin.kafka/write-messages
@@ -119,12 +128,13 @@
      :kafka/offset-reset
      :kafka/force-reset?
      :kafka/deserializer-fn
-     :kafka/chan-capacity
-     :kafka/request-size
-     :kafka/fetch-size
-     :kafka/empty-read-back-off
+     :kafka/receive-buffer-bytes
      :kafka/commit-interval
-     :kafka/wrap-with-metadata?]
+     :kafka/wrap-with-metadata?
+     :kafka/empty-read-back-off
+     :kafka/fetch-size
+     :kafka/request-size
+     :kafka/chan-capacity]
 
     :onyx.plugin.kafka/write-messages
     [:kafka/topic
