@@ -2,7 +2,6 @@
 #### 0.9.10.0
 * **BREAKING CHANGE* `:kafka/chan-capacity` has been removed as there is no longer a separate reader thread producing messages
 * **BREAKING CHANGE* `:kafka/empty-read-back-off` has been removed as there is no longer a separate reader thread producing messages. Tweak `:onyx/batch-timeout` instead, as this will change the kafka consumer poll time.
-* **BREAKING CHANGE* `:kafka/request-size` deprecated. Use `:kafka/receive-buffer-bytes`.
 * **BREAKING CHANGE* `:kafka/fetch-size` deprecated. Use `:kafka/receive-buffer-bytes`.
 * Large performance improvements were made.
 * Moved franzy-admin and franzy-embedded server dependencies to dev dependencies to reduce dependency bloat
