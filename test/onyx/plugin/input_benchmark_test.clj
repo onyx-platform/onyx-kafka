@@ -1,5 +1,5 @@
 (ns onyx.plugin.input-benchmark-test
-  (:require [clojure.core.async :refer [<!! go pipe timeout]]
+  (:require [clojure.core.async :refer [<!! go pipe timeout chan alts!!]]
             [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]

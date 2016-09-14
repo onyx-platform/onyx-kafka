@@ -38,7 +38,7 @@
               :optional? true}
 
              :kafka/receive-buffer-bytes
-             {:doc "The size in bytes to request from Kafka per fetch request."
+             {:doc "The size in the receive buffer in the Kafka consumer."
               :type :long
               :default 65536
               :optional? true}
@@ -73,13 +73,6 @@
              {:doc "Wraps message into map with keys `:offset`, `:partitions`, `:topic` and `:message` itself."
               :type :boolean
               :default false
-              :optional? true}
-
-             :kafka/request-size
-             {:doc "The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer."
-              :type :long
-              :deprecation-version "0.9.10.0"
-              :deprecation-doc ":kafka/request-size deprecated as it is not respected by the consumer. Use :kafka/receive-buffer-bytes"
               :optional? true}}}
 
     :onyx.plugin.kafka/write-messages
@@ -97,6 +90,11 @@
              :kafka/zookeeper
              {:doc "The ZooKeeper connection string."
               :type :string}
+
+             :kafka/request-size
+             {:doc "The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer."
+              :type :long
+              :optional? true}
 
              :kafka/serializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment."
@@ -133,7 +131,6 @@
      :kafka/wrap-with-metadata?
      :kafka/empty-read-back-off
      :kafka/fetch-size
-     :kafka/request-size
      :kafka/chan-capacity]
 
     :onyx.plugin.kafka/write-messages
@@ -141,4 +138,5 @@
      :kafka/zookeeper
      :kafka/partition
      :kafka/serializer-fn
+     :kafka/request-size
      :kafka/no-seal?]}})
