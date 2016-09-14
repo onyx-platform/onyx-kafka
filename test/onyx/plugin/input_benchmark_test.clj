@@ -18,14 +18,20 @@
             [onyx.kafka.utils :refer [take-until-done]]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
-            [franzy.embedded.configuration]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
             [onyx.plugin.test-utils :as test-utils]
             [onyx.plugin.kafka]
             [onyx.api])
   (:import [franzy.clients.producer.types ProducerRecord]))
 
-(franzy.embedded.configuration/make-kafka-config)
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+; Note, this test requires a non embedded Kafka and ZooKeeper. ZooKeeper must be running on 2181 (not 2188 as Onyx generally uses) 
+; Kafka must run on port 127.0.0.1:9092
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
 
 (def compress-opts {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
 
@@ -37,7 +43,7 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition 500000)
+(def messages-per-partition 2000000)
 (def n-partitions 2)
 
 (defn print-message [segment]

@@ -122,7 +122,6 @@
      :kafka/chan-capacity
      :kafka/request-size
      :kafka/fetch-size
-     :kafka/poll-timeout-ms
      :kafka/empty-read-back-off
      :kafka/commit-interval
      :kafka/wrap-with-metadata?]
