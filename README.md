@@ -42,7 +42,7 @@ Catalog entry:
  :onyx/medium :kafka
  :kafka/topic "my topic"
  :kafka/group-id "onyx-consumer"
- :kafka/fetch-size 307200
+ :kafka/receive-buffer-bytes 307200
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/offset-reset :smallest
  :kafka/force-reset? true

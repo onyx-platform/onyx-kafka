@@ -1,5 +1,5 @@
 (ns onyx.plugin.input-benchmark-test
-  (:require [clojure.core.async :refer [<!! go pipe]]
+  (:require [clojure.core.async :refer [<!! go pipe timeout]]
             [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
@@ -18,14 +18,20 @@
             [onyx.kafka.utils :refer [take-until-done]]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
-            [franzy.embedded.configuration]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
             [onyx.plugin.test-utils :as test-utils]
             [onyx.plugin.kafka]
             [onyx.api])
   (:import [franzy.clients.producer.types ProducerRecord]))
 
-(franzy.embedded.configuration/make-kafka-config)
+
+;;;;;;;;;;;;;;;;;;;;;;;
+;;;
+; Note, this test requires a non embedded Kafka and ZooKeeper. ZooKeeper must be running on 2181 (not 2188 as Onyx generally uses) 
+; Kafka must run on port 127.0.0.1:9092
+;;;
+;;;;;;;;;;;;;;;;;;;;;;;
+
 
 (def compress-opts {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
 
@@ -37,8 +43,8 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition 500000)
-(def n-partitions 2)
+(def messages-per-partition 2000000)
+(def n-partitions 1)
 
 (defn print-message [segment]
   segment
@@ -71,11 +77,10 @@
                              :kafka/zookeeper zk-address
                              :kafka/offset-reset :smallest
                              :kafka/force-reset? true
+                             :kafka/receive-buffer-bytes 65536
                              :kafka/deserializer-fn ::decompress
                              :onyx/fn ::print-message
-                             :kafka/fetch-size 307200
-                             :kafka/request-size 307200
-                             :onyx/batch-timeout 50
+                             :onyx/batch-timeout 500
                              :onyx/batch-size batch-size
                              :onyx/max-pending 10000
                              :onyx/min-peers n-partitions
@@ -105,6 +110,17 @@
                          (range messages-per-partition))))))
     (println "Successfully wrote messages")))
 
+(defn take-until-nothing!
+  [ch timeout-ms]
+   (loop [ret []]
+     (let [tmt (if timeout-ms (timeout timeout-ms) (chan))
+           [v c] (alts!! [ch tmt] :priority true)]
+       (if (= c tmt)
+         ret
+         (if (and v (not= v :done))
+           (recur (conj ret v))
+           (conj ret :done))))))
+
 (deftest ^:benchmark kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
@@ -126,7 +142,7 @@
            job-id (:job-id job-ret)
            start-time (System/currentTimeMillis)
            read-nothing-timeout 10000
-           read-segments (onyx.plugin.core-async/take-segments! out read-nothing-timeout)]
+           read-segments (take-until-nothing! out read-nothing-timeout)]
        (is (= (* n-partitions messages-per-partition) (count read-segments))) 
        (let [run-time (- (System/currentTimeMillis) start-time read-nothing-timeout)
              n-messages-total (* n-partitions messages-per-partition)]
