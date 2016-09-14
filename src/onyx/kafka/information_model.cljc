@@ -33,6 +33,8 @@
              {:doc "The buffer size of the Kafka reading channel."
               :type :long
               :default 1000
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/chan-capacity deprecated as onyx-kafka no longer uses a separate producer thread."
               :optional? true}
 
              :kafka/fetch-size
@@ -45,6 +47,8 @@
              {:doc "The amount of time to back off between reads when nothing was fetched from a consumer."
               :type :long
               :default 500
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/empty-read-back-off deprecated in lieu of better use of :onyx/batch-timeout"
               :optional? true}
 
              :kafka/commit-interval
@@ -118,6 +122,7 @@
      :kafka/chan-capacity
      :kafka/request-size
      :kafka/fetch-size
+     :kafka/poll-timeout-ms
      :kafka/empty-read-back-off
      :kafka/commit-interval
      :kafka/wrap-with-metadata?]

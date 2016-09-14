@@ -25,9 +25,8 @@
    :kafka/force-reset? s/Bool
    :kafka/deserializer-fn os/NamespacedKeyword
    (s/optional-key :kafka/partition) s/Str
-   (s/optional-key :kafka/chan-capacity) s/Num
    (s/optional-key :kafka/fetch-size) s/Num
-   (s/optional-key :kafka/empty-read-back-off) s/Num
+   (s/optional-key :kafka/request-size) s/Num
    (s/optional-key :kafka/commit-interval) s/Num
    (s/optional-key :kafka/wrap-with-metadata?) s/Bool
    (os/restricted-ns :kafka) s/Any})
@@ -38,9 +37,7 @@
                              :onyx/plugin :onyx.plugin.kafka/read-messages
                              :onyx/type :input
                              :onyx/medium :kafka
-                             :kafka/chan-capacity 1000
                              :kafka/fetch-size 307200
-                             :kafka/empty-read-back-off 500
                              :kafka/commit-interval 2000
                              :kafka/wrap-with-metadata? false
                              :onyx/doc "Reads messages from a Kafka topic"}

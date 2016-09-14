@@ -8,13 +8,16 @@
  :peer-config
  {:onyx/tenancy-id                       #env [ONYX_ID "testcluster"]
   :zookeeper/address                     #cond {:default #env [ZOOKEEPER "zookeeper"]
+                                                :bench "127.0.0.1:2181"
                                                 :test "127.0.0.1:2188"}
   :onyx.peer/job-scheduler               :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout           60000
   :onyx.messaging/allow-short-circuit?   #cond {:default true
+                                                :bench true
                                                 :test false}
   :onyx.messaging/impl                   :aeron
   :onyx.messaging/bind-addr              #env [BIND_ADDR "localhost"]
   :onyx.messaging/peer-port              40200
   :onyx.messaging.aeron/embedded-driver? #cond {:default false
+                                                :bench true
                                                 :test true}}}
