@@ -16,8 +16,8 @@
                  [org.onyxplatform/onyx "0.9.10-beta4"]
                  [lbradstreet/franzy "0.0.2"]
                  [com.stuartsierra/component "0.2.3"]]
-  :test-selectors {:default (complement :slow)
-                   :slow :slow
+  :test-selectors {:default (complement :benchmark)
+                   :benchmark :benchmark
                    :all (constantly true)}
   :profiles {:dev {:dependencies [[cheshire "5.5.0"]
                                   [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
