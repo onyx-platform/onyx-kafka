@@ -37,7 +37,7 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition (or (System/getenv "BENCH_MESSAGES") 50000))
+(def messages-per-partition 500000)
 (def n-partitions 2)
 
 (defn print-message [segment]
@@ -105,7 +105,7 @@
                          (range messages-per-partition))))))
     (println "Successfully wrote messages")))
 
-(deftest kafka-input-test
+(deftest ^:benchmark kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :bench})
