@@ -67,7 +67,7 @@
     (-> base-job
         (add-task (consumer :read-messages
                             {:kafka/topic topic
-                             :kafka/group-id "onyx-consumer"
+                             :kafka/group-id "onyx-consumer-1"
                              :kafka/zookeeper zk-address
                              :kafka/offset-reset :smallest
                              :kafka/force-reset? true
@@ -101,7 +101,7 @@
        (mapv deref 
              (doall (map (fn [x]
                            ;; 116 bytes messages
-                           (send-async! producer1 (ProducerRecord. topic p nil (compress {:n 10 :really-long-string (apply str (repeatedly 30 (fn [] (rand-int 500))))})))) 
+                           (send-async! producer1 (ProducerRecord. topic p nil (compress {:n x :really-long-string (apply str (repeatedly 30 (fn [] (rand-int 500))))})))) 
                          (range messages-per-partition))))))
     (println "Successfully wrote messages")))
 
@@ -125,8 +125,9 @@
            _ (println "Job ret" job-ret)
            job-id (:job-id job-ret)
            start-time (System/currentTimeMillis)
-           read-nothing-timeout 10000]
-       (is (= (* n-partitions messages-per-partition) (count (onyx.plugin.core-async/take-segments! out read-nothing-timeout)))) 
+           read-nothing-timeout 10000
+           read-segments (onyx.plugin.core-async/take-segments! out read-nothing-timeout)]
+       (is (= (* n-partitions messages-per-partition) (count read-segments))) 
        (let [run-time (- (System/currentTimeMillis) start-time read-nothing-timeout)
              n-messages-total (* n-partitions messages-per-partition)]
          (println (float (* 1000 (/ n-messages-total run-time))) "messages per second. Processed" n-messages-total "messages in" run-time "ms."))
