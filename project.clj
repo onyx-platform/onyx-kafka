@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-kafka "0.9.10.0-SNAPSHOT"
+(defproject org.onyxplatform/onyx-kafka "0.9.10.0-beta5"
   :description "Onyx plugin for Kafka"
   :url "https://github.com/onyx-platform/onyx-kafka"
   :license {:name "Eclipse Public License"
@@ -13,7 +13,7 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.9.10-SNAPSHOT"]
+                 [org.onyxplatform/onyx "0.9.10-beta5"]
                  [ymilky/franzy "0.0.1"]
                  [com.stuartsierra/component "0.2.3"]]
   :test-selectors {:default (complement :benchmark)
