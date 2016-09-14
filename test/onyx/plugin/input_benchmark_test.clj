@@ -110,6 +110,17 @@
                          (range messages-per-partition))))))
     (println "Successfully wrote messages")))
 
+(defn take-until-nothing!
+  [ch timeout-ms]
+   (loop [ret []]
+     (let [tmt (if timeout-ms (timeout timeout-ms) (chan))
+           [v c] (alts!! [ch tmt] :priority true)]
+       (if (= c tmt)
+         ret
+         (if (and v (not= v :done))
+           (recur (conj ret v))
+           (conj ret :done))))))
+
 (deftest ^:benchmark kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
@@ -131,7 +142,7 @@
            job-id (:job-id job-ret)
            start-time (System/currentTimeMillis)
            read-nothing-timeout 10000
-           read-segments (onyx.plugin.core-async/take-segments! out read-nothing-timeout)]
+           read-segments (take-until-nothing! out read-nothing-timeout)]
        (is (= (* n-partitions messages-per-partition) (count read-segments))) 
        (let [run-time (- (System/currentTimeMillis) start-time read-nothing-timeout)
              n-messages-total (* n-partitions messages-per-partition)]
