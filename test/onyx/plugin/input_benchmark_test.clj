@@ -37,8 +37,8 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition 5000000)
-(def n-partitions 1)
+(def messages-per-partition (or (System/getenv "BENCH_MESSAGES") 50000))
+(def n-partitions 2)
 
 (defn print-message [segment]
   segment
