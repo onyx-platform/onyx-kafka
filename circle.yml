@@ -7,6 +7,8 @@ test:
   override:
     - lein test:
         timeout: 480
+    - lein test :broker-reboot:
+        timeout: 480
 
 machine:
   java:

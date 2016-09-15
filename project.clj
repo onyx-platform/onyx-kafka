@@ -16,7 +16,8 @@
                  [org.onyxplatform/onyx "0.9.10-beta5"]
                  [ymilky/franzy "0.0.1"]
                  [com.stuartsierra/component "0.2.3"]]
-  :test-selectors {:default (complement :benchmark)
+  :test-selectors {:default (fn [v] (not (or (:benchmark v) (:broker-reboot v))))
+                   :broker-reboot :broker-reboot
                    :benchmark :benchmark
                    :all (constantly true)}
   :profiles {:dev {:dependencies [[cheshire "5.5.0"]

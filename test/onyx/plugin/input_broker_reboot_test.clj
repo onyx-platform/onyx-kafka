@@ -44,7 +44,7 @@
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
 
-(deftest ^:benchmark kafka-broker-reboot-test
+(deftest ^:broker-reboot kafka-broker-reboot-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
