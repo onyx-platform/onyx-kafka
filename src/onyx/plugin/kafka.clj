@@ -147,7 +147,6 @@
                          :group.id group-id}
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         client-id "onyx"
-        zk-utils (k-admin/make-zk-utils {:servers (:kafka/zookeeper task-map)} false)
         retry-ch (:retry-ch pipeline)
         pending-messages (:pending-messages pipeline)
         pending-commits (:pending-commits pipeline)
