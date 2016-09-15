@@ -66,19 +66,18 @@
 
         producer-config {:bootstrap.servers ["127.0.0.1:9092"]}
         key-serializer (byte-array-serializer)
-        value-serializer (byte-array-serializer)
-
-        producer1 (producer/make-producer producer-config key-serializer value-serializer)
-        producer2 (producer/make-producer producer-config key-serializer value-serializer)]
-
-    (doseq [x (range 3)] ;0 1 2
-      (send-sync! producer1 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n x})))))
-    (doseq [x (range 3)] ;3 4 5
-      (send-sync! producer2 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n (+ 3 x)})))))
+        value-serializer (byte-array-serializer)]
+    (with-open [producer1 (producer/make-producer producer-config key-serializer value-serializer)]
+      (with-open [producer2 (producer/make-producer producer-config key-serializer value-serializer)]
+        (doseq [x (range 3)] ;0 1 2
+          (send-sync! producer1 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n x})))))
+        (doseq [x (range 3)] ;3 4 5
+          (send-sync! producer2 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n (+ 3 x)})))))))
     kafka-server))
 
 (deftest kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
+        _ (println "Using topic" test-topic)
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
         tenancy-id (str (java.util.UUID/randomUUID))

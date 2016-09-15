@@ -48,14 +48,14 @@
          _ (create-topic zookeeper topic)
          config {:bootstrap.servers ["127.0.0.1:9092"]}
          key-serializer (byte-array-serializer)
-         value-serializer (byte-array-serializer)
-         prod (producer/make-producer config key-serializer value-serializer)]
-     (if (sequential? xs)
-       (doseq [x xs]
-         (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str x)))))
-       (go-loop [itm (<! xs)]
-         (if itm
-           (do
-             (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str itm))))
-             (recur (<! xs))))))
+         value-serializer (byte-array-serializer)]
+     (with-open [prod (producer/make-producer config key-serializer value-serializer)]
+       (if (sequential? xs)
+         (doseq [x xs]
+           (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str x)))))
+         (go-loop [itm (<! xs)]
+                  (if itm
+                    (do
+                     (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str itm))))
+                     (recur (<! xs)))))))
      kafka-server)))

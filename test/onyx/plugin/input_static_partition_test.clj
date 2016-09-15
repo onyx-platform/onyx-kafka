@@ -40,6 +40,7 @@
 
 (deftest kafka-static-partition-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
+        _ (println "Using topic" test-topic)
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
         zk-address (get-in peer-config [:zookeeper/address])
