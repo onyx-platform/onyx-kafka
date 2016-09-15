@@ -93,5 +93,5 @@
         (reset! mock (mock-kafka test-topic zk-address))
         (onyx.api/submit-job peer-config job)
         (is (= 15
-               (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 5000))))))
+               (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000))))))
       (finally (swap! mock component/stop)))))

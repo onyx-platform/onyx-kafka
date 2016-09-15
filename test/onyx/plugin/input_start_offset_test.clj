@@ -90,5 +90,5 @@
         (onyx.test-helper/validate-enough-peers! test-env job)
         (reset! mock (mock-kafka test-topic zk-address))
         (onyx.api/submit-job peer-config job)
-        (is (= [{:n 1} {:n 2} {:n 3} {:n 4}] (onyx.plugin.core-async/take-segments! out 5000))))
+        (is (= [{:n 1} {:n 2} {:n 3} {:n 4}] (onyx.plugin.core-async/take-segments! out 10000))))
       (finally (swap! mock component/stop)))))
