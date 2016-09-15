@@ -66,6 +66,7 @@
        (onyx.api/submit-job peer-config job)
        (Thread/sleep 5000)
        (swap! mock component/stop)
+       (Thread/sleep 5000)
        (swap! mock component/start)
        (Thread/sleep 5000)
        (doseq [x test-data2] (>!! input-chan x))
