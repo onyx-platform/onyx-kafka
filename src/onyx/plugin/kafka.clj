@@ -1,7 +1,7 @@
 (ns onyx.plugin.kafka
   (:require [clojure.core.async :as a :refer [chan >!! <!! close! timeout sliding-buffer]]
-            [franzy.admin.zookeeper.client :as k-admin]
             [franzy.admin.cluster :as k-cluster]
+            [franzy.admin.zookeeper.client :as k-admin]
             [franzy.admin.partitions :as k-partitions]
             [franzy.serialization.serializers :refer [byte-array-serializer]]
             [franzy.serialization.deserializers :refer [byte-array-deserializer]]
@@ -10,6 +10,7 @@
             [franzy.clients.producer.types :refer [make-producer-record]]
             [franzy.clients.consumer.protocols :as proto]
             [franzy.clients.consumer.client :as consumer]
+            [franzy.common.metadata.protocols :as metadata]
             [franzy.clients.consumer.protocols :refer [assign-partitions! commit-offsets-sync!
                                                        poll! seek-to-offset!] :as cp]
             [taoensso.timbre :as log :refer [fatal info]]
@@ -71,7 +72,7 @@
 ;; kafka operations
 
 (defn id->broker [zk-addr]
-  (let [config (k-admin/make-zk-utils {:servers zk-addr} false)]
+  (with-open [zk-utils (k-admin/make-zk-utils {:servers zk-addr} false)]
     (reduce
      (fn [result {:keys [id endpoints]}]
        (assoc
@@ -81,7 +82,7 @@
              ":"
              (get-in endpoints [:plaintext :port]))))
      {}
-     (k-cluster/all-brokers config))))
+     (k-cluster/all-brokers zk-utils))))
 
 (defn find-brokers [zk-addr]
   (let [results (vals (id->broker zk-addr))]
@@ -139,20 +140,12 @@
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         client-id "onyx"
         zk-utils (k-admin/make-zk-utils {:servers (:kafka/zookeeper task-map)} false)
-        partitions (first (vals (k-partitions/partitions-for zk-utils [topic])))
-        n-partitions (count partitions)
-        _ (check-num-peers-equals-partitions task-map n-partitions)
         retry-ch (:retry-ch pipeline)
         pending-messages (:pending-messages pipeline)
         pending-commits (:pending-commits pipeline)
         job-id (:onyx.core/job-id event)
         peer-id (:onyx.core/id event)
         task-id (:onyx.core/task-id event)
-        done-unsupported? (and (> (count partitions) 1)
-                               (not (:kafka/partition task-map)))
-        kpartition (if partition
-                     (Integer/parseInt (str partition))
-                     (log-id @replica job-id peer-id task-id))
         consumer-config {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
                          :group.id group-id
                          :enable.auto.commit false
@@ -162,10 +155,17 @@
         key-deserializer (byte-array-deserializer)
         value-deserializer (byte-array-deserializer)
         consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
+        kpartition (if partition
+                     (Integer/parseInt (str partition))
+                     (log-id @replica job-id peer-id task-id))
+        partitions (mapv :partition (metadata/partitions-for consumer topic))
+        n-partitions (count partitions)
+        done-unsupported? (and (> (count partitions) 1)
+                               (not (:kafka/partition task-map)))
+        _ (check-num-peers-equals-partitions task-map n-partitions)
         _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
         _ (seek-offset! log consumer group-id topic kpartition task-map)
         offset (cp/next-offset consumer {:topic topic :partition kpartition})
-        poll-timeout-ms (or (:kafka/poll-timeout-ms task-map) (:kafka/poll-timeout-ms defaults))
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         commit-fut (future (commit-loop log group-id topic kpartition commit-interval pending-commits))]
     {:kafka/commit-fut commit-fut
