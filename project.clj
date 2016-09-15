@@ -33,7 +33,8 @@
                                   *assert* false
                                   *unchecked-math* :warn-on-boxed}
                    :java-opts ^:replace ["-server"
-                                         "-Xmx4g"
+                                         "-Xmx3g"
+                                         "-Daeron.client.liveness.timeout=50000000000"
                                          ;"-XX:+UnlockCommercialFeatures" 
                                          ;"-XX:+FlightRecorder"
                                          ;"-XX:+UnlockDiagnosticVMOptions"
