@@ -3,6 +3,8 @@
 * **BREAKING CHANGE* `:kafka/chan-capacity` has been removed as there is no longer a separate reader thread producing messages
 * **BREAKING CHANGE* `:kafka/empty-read-back-off` has been removed as there is no longer a separate reader thread producing messages. Tweak `:onyx/batch-timeout` instead, as this will change the kafka consumer poll time.
 * **BREAKING CHANGE* `:kafka/fetch-size` deprecated. Use `:kafka/receive-buffer-bytes`.
+* Added `:kafka/start-offsets`, allowing a job to be started at a particular offset on each partition that is being read from.
+* Fixed several issues with unclosed ZooKeeper connections
 * Large performance improvements were made.
 * Moved franzy-admin and franzy-embedded server dependencies to dev dependencies to reduce dependency bloat
 

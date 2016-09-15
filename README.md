@@ -9,7 +9,7 @@ This plugin version is *only compatible with Kafka 0.9+*. Please use [onyx-kafka
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.9.10.0-beta5"]
+[org.onyxplatform/onyx-kafka "0.9.10.0-beta6"]
 ```
 
 In your peer boot-up namespace:
@@ -49,6 +49,7 @@ Catalog entry:
  :kafka/commit-interval 500
  :kafka/deserializer-fn :my.ns/deserializer-fn
  :kafka/wrap-with-metadata? false
+ ;; :kafka/start-offsets {p1 offset1, p2, offset2}
  :onyx/batch-timeout 50
  :onyx/min-peers <<NUMBER-OF-PARTITIONS>>
  :onyx/max-peers <<NUMBER-OF-PARTITIONS>>
@@ -77,6 +78,7 @@ Lifecycle entry:
 |`:kafka/commit-interval`     | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
 |`:kafka/deserializer-fn`     | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
 |`:kafka/wrap-with-metadata?` | `boolean` |`false`  | Wraps message into map with keys `:offset`, `:partitions`, `:topic` and `:message` itself
+|`:kafka/start-offsets`       | `map`     |         | Allows a task to be supplied with the starting offsets for all partitions. Maps partition to offset, e.g. `{0 50, 1, 90}` will start at offset 50 for partition 0, and offset 90 for partition 1
 
 ##### write-messages
 
