@@ -24,6 +24,7 @@
    :kafka/offset-reset (s/enum :smallest :largest)
    :kafka/force-reset? s/Bool
    :kafka/deserializer-fn os/NamespacedKeyword
+   (s/optional-key :kafka/start-offsets) {s/Int s/Int}
    (s/optional-key :kafka/receive-buffer-bytes) s/Int
    (s/optional-key :kafka/partition) s/Str
    (s/optional-key :kafka/commit-interval) s/Num

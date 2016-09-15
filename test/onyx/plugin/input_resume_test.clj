@@ -34,6 +34,7 @@
                                        :kafka/offset-reset :smallest
                                        :kafka/force-reset? false
                                        :kafka/commit-interval 500
+                                       :onyx/pending-timeout 20000
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
@@ -54,6 +55,7 @@
 
 (deftest kafka-resume-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
+        _ (println "Using topic" test-topic)
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})
         tenancy-id (str (java.util.UUID/randomUUID))

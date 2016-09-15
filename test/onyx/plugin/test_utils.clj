@@ -51,11 +51,13 @@
          value-serializer (byte-array-serializer)
          prod (producer/make-producer config key-serializer value-serializer)]
      (if (sequential? xs)
-       (doseq [x xs]
-         (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str x)))))
+       (do (doseq [x xs]
+             (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str x)))))
+           (.close prod))
        (go-loop [itm (<! xs)]
-         (if itm
-           (do
-             (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str itm))))
-             (recur (<! xs))))))
+                (if itm
+                  (do
+                   (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str itm))))
+                   (recur (<! xs)))
+                  (.close prod))))
      kafka-server)))
