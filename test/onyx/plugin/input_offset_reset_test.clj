@@ -36,6 +36,7 @@
                                        :kafka/force-reset? true
                                        :kafka/commit-interval 500
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
+                                       :onyx/pending-timeout 20000
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))

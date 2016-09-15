@@ -45,16 +45,24 @@
 (defn checkpoint-name [group-id topic assigned-partition]
   (format "%s-%s-%s" group-id topic assigned-partition))
 
-(defn checkpoint-or-beginning [log consumer topic kpartition group-id]
+(defn checkpoint-or-beginning [log consumer topic kpartition group-id task-map]
   (let [k (checkpoint-name group-id topic kpartition)]
     (try
       (let [offset (inc (:offset (extensions/read-chunk log :chunk k)))]
         (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
       (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-        (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}])))))
+        (if-let [start-offsets (:kafka/start-offsets task-map)]
+          (let [offset (get start-offsets kpartition)]
+            (when-not offset
+              (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
+                              {:missing-partition kpartition
+                               :kafka/start-offsets start-offsets})))
+            (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
+          (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))
 
 (defn seek-offset! [log consumer group-id topic kpartition task-map]
-  (if (:kafka/force-reset? task-map)
+  (if (and (:kafka/force-reset? task-map)
+           (not (:kafka/start-offset task-map)))
     (let [policy (:kafka/offset-reset task-map)]
       (cond (= policy :smallest)
             (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}])
@@ -64,7 +72,7 @@
 
             :else
             (throw (ex-info "Tried to seek to unknown policy" {:policy policy}))))
-    (checkpoint-or-beginning log consumer topic kpartition group-id)))
+    (checkpoint-or-beginning log consumer topic kpartition group-id task-map)))
 
 (defn log-id [replica-val job-id peer-id task-id]
   (get-in replica-val [:task-slot-ids job-id task-id peer-id]))

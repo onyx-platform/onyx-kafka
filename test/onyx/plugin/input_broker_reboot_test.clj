@@ -35,6 +35,7 @@
                                        :kafka/offset-reset :smallest
                                        :kafka/force-reset? false
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
+                                       :onyx/pending-timeout 20000
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))
@@ -43,7 +44,7 @@
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
 
-(deftest kafka-broker-reboot-test
+(deftest ^:benchmark kafka-broker-reboot-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :test})

@@ -56,7 +56,7 @@
   (let [kafka-server (component/start
                       (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
                                           :port 9092
-                                          :broker.id 0
+                                          :broker.id 1
                                           :log.dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
                                           :zookeeper.connect zookeeper
                                           :controlled.shutdown.enable false}))
