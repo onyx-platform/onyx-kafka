@@ -141,10 +141,8 @@
 
 (defn start-kafka-consumer
   [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/log onyx.core/replica] :as event} lifecycle]
-  (let [{:keys [kafka/topic kafka/partition kafka/group-id]} task-map
+  (let [{:keys [kafka/topic kafka/partition kafka/group-id kafka/consumer-opts]} task-map
         brokers (find-brokers (:kafka/zookeeper task-map))
-        consumer-config {:bootstrap.servers brokers
-                         :group.id group-id}
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         client-id "onyx"
         retry-ch (:retry-ch pipeline)
@@ -153,12 +151,14 @@
         job-id (:onyx.core/job-id event)
         peer-id (:onyx.core/id event)
         task-id (:onyx.core/task-id event)
-        consumer-config {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
-                         :group.id group-id
-                         :enable.auto.commit false
-                         :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
-                                                   (:kafka/receive-buffer-bytes defaults))
-                         :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
+        consumer-config (merge
+                         {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
+                          :group.id group-id
+                          :enable.auto.commit false
+                          :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
+                                                    (:kafka/receive-buffer-bytes defaults))
+                          :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
+                         consumer-opts)
         key-deserializer (byte-array-deserializer)
         value-deserializer (byte-array-deserializer)
         consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
@@ -352,8 +352,11 @@
 (defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
         request-size (or (get task-map :kafka/request-size) (get defaults :kafka/request-size))
-        config {:bootstrap.servers (vals (id->broker (:kafka/zookeeper task-map)))
-                :max.request.size request-size}
+        producer-opts (:kafka/producer-opts task-map)
+        config (merge
+                {:bootstrap.servers (vals (id->broker (:kafka/zookeeper task-map)))
+                 :max.request.size request-size}
+                producer-opts)
         topic (:kafka/topic task-map)
         key-serializer (byte-array-serializer)
         value-serializer (byte-array-serializer)

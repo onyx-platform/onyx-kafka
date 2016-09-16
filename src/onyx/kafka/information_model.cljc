@@ -43,6 +43,11 @@
               :default 65536
               :optional? true}
 
+             :kafka/consumer-opts
+             {:doc "A map of arbitrary configuration to merge into the underlying Kafka consumer base configuration."
+              :type :map
+              :optional? true}
+
              :kafka/fetch-size
              {:doc "The size in bytes to request from ZooKeeper per fetch request."
               :type :long
@@ -104,6 +109,11 @@
              :kafka/serializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment."
               :type :keyword}
+
+             :kafka/producer-opts
+             {:doc "A map of arbitrary configuration to merge into the underlying Kafka producer base configuration."
+              :type :map
+              :optional? true}
 
              :kafka/no-seal?
              {:doc "Do not write :done to the topic when task receives the sentinel signal (end of batch job)."
