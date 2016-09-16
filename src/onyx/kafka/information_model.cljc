@@ -145,6 +145,7 @@
      :kafka/commit-interval
      :kafka/wrap-with-metadata?
      :kafka/start-offsets
+     :kafka/consumer-opts
      :kafka/empty-read-back-off
      :kafka/fetch-size
      :kafka/chan-capacity]
@@ -155,4 +156,5 @@
      :kafka/partition
      :kafka/serializer-fn
      :kafka/request-size
-     :kafka/no-seal?]}})
+     :kafka/no-seal?
+     :kafka/producer-opts]}})
