@@ -33,10 +33,9 @@
                                   *assert* false
                                   *unchecked-math* :warn-on-boxed}
                    :java-opts ^:replace ["-server"
-                                         "-Xmx3g"
+                                         "-Xmx4g"
                                          "-Daeron.client.liveness.timeout=50000000000"
-                                         ;"-XX:+UnlockCommercialFeatures" 
-                                         ;"-XX:+FlightRecorder"
-                                         ;"-XX:+UnlockDiagnosticVMOptions"
-                                         ;"-XX:StartFlightRecording=duration=1080s,filename=localrecording.jfr"
-                                         ]}})
+                                         "-XX:+UnlockCommercialFeatures" 
+                                         "-XX:+FlightRecorder"
+                                         "-XX:+UnlockDiagnosticVMOptions"
+                                         "-XX:StartFlightRecording=duration=240s,filename=localrecording.jfr"]}})
