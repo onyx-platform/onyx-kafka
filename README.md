@@ -181,6 +181,22 @@ This can be used like so:
 
 ```
 
+#### Development
+
+To benchmark, start a real ZooKeeper instance (at 127.0.0.1:2181) and Kafka instance, and run the following benchmarks.
+
+Write perf, single peer writer:
+```
+TIMBRE_LOG_LEVEL=info lein test onyx.plugin.output-bench-test :benchmark
+```
+
+Read perf, single peer reader:
+```
+TIMBRE_LOG_LEVEL=info lein test onyx.plugin.input-benchmark-test :benchmark
+```
+
+Past results are maintained in `dev-resources/benchmarking/results.txt`.
+
 #### Contributing
 
 Pull requests into the master branch are welcomed.
