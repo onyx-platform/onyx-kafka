@@ -1,5 +1,6 @@
 #### 0.9.10.1
 * **Major bug fix** Resumption of checkpointing was only occurring between jobs using the same `:onyx/tenancy-id`.
+* Added ability to pass in arbitrary consumer and producer options via `:kafka/producer-opts` and `:kakfa/consumer-opts`
 * Greatly improve performance of kafka write plugin.
 * Kill Onyx jobs, rather than rebooting peers, on several unrecoverable plugin errors.
 
