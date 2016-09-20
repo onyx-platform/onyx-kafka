@@ -315,7 +315,7 @@
   (.close (:kafka/producer event)))
 
 (defn- message->producer-record
-  [{:keys [serializer-fn topic]} m]
+  [serializer-fn topic m]
   (let [message (:message m)
         k (some-> m :key serializer-fn)
         p (some-> m :partition int)
@@ -345,7 +345,7 @@
       (doall
        (->> messages
             (map (fn [msg]
-                   (send-async! producer (message->producer-record this (:message msg)))))
+                   (send-async! producer (message->producer-record serializer-fn topic (:message msg)))))
             (doall)
             (run! deref)))
       {}))
