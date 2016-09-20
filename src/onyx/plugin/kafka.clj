@@ -344,12 +344,11 @@
   (write-batch
     [this {:keys [onyx.core/results]}]
     (let [messages (mapcat :leaves (:tree results))]
-      (doall
-       (->> messages
-            (map (fn [msg]
-                   (send-async! producer (message->producer-record serializer-fn topic (:message msg)))))
-            (doall)
-            (run! deref)))
+      (->> messages
+           (map (fn [msg]
+                  (send-async! producer (message->producer-record serializer-fn topic (:message msg)))))
+           (doall)
+           (run! deref))
       {}))
 
   (seal-resource
