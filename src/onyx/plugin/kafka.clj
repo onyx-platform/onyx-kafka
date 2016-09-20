@@ -13,6 +13,8 @@
             [franzy.common.metadata.protocols :as metadata]
             [franzy.clients.consumer.protocols :refer [assign-partitions! commit-offsets-sync!
                                                        poll! seek-to-offset!] :as cp]
+            [onyx.log.curator :as zk]
+            [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.default-vals :refer [arg-or-default]]
@@ -42,23 +44,45 @@
      x)
     :none))
 
+(defn checkpoint-str [id]
+  (str "/onyx/onyx-kafka/checkpoint/" id))
+
+;; Temporary until ABS
+(defn commit! [{:keys [conn opts prefix monitoring] :as log} chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (let [node (checkpoint-str id) 
+          version (:version (zk/exists conn node))]
+      (if (nil? version)
+        (zk/create-all conn node :persistent? true :data bytes)
+        (zk/set-data conn node bytes version)))))
+
+(defn read-commit [{:keys [conn opts prefix monitoring] :as log} id]
+  (let [node (checkpoint-str id)]
+    (zookeeper-decompress (:data (zk/data conn node)))))
+
 (defn checkpoint-name [group-id topic assigned-partition]
   (format "%s-%s-%s" group-id topic assigned-partition))
 
 (defn checkpoint-or-beginning [log consumer topic kpartition group-id task-map]
   (let [k (checkpoint-name group-id topic kpartition)]
     (try
-      (let [offset (inc (:offset (extensions/read-chunk log :chunk k)))]
+      (let [offset (inc (:offset (read-commit log k)))]
         (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
       (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-        (if-let [start-offsets (:kafka/start-offsets task-map)]
-          (let [offset (get start-offsets kpartition)]
-            (when-not offset
-              (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
-                              {:missing-partition kpartition
-                               :kafka/start-offsets start-offsets})))
-            (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
-          (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))
+        (try
+         ;; Try again using 0.9.9.0/0.9.10.0 checkpoint method
+         ;; This allows users to transition to new checkpoint from old method
+         (let [offset (inc (:offset (extensions/read-chunk log :chunk k)))]
+           (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
+         (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+           (if-let [start-offsets (:kafka/start-offsets task-map)]
+             (let [offset (get start-offsets kpartition)]
+               (when-not offset
+                 (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
+                                 {:missing-partition kpartition
+                                  :kafka/start-offsets start-offsets})))
+               (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
+             (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))))
 
 (defn seek-offset! [log consumer group-id topic kpartition task-map]
   (if (and (:kafka/force-reset? task-map)
@@ -71,7 +95,8 @@
             (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}])
 
             :else
-            (throw (ex-info "Tried to seek to unknown policy" {:policy policy}))))
+            (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
+                                                               :policy policy}))))
     (checkpoint-or-beginning log consumer topic kpartition group-id task-map)))
 
 (defn log-id [replica-val job-id peer-id task-id]
@@ -97,7 +122,8 @@
     (if (seq results)
       results
       (throw (ex-info "Could not locate any Kafka brokers to connect to."
-                      {:zk-addr zk-addr})))))
+                      {:recoverable? true
+                       :zk-addr zk-addr})))))
 
 (defn highest-offset-to-commit [offsets]
   (->> (sort offsets)
@@ -114,7 +140,7 @@
       (when-let [offset (highest-offset-to-commit @pending-commits)]
         (let [k (checkpoint-name group-id topic kpartition)
               data {:offset offset}]
-          (extensions/force-write-chunk log :chunk data k)
+          (commit! log data k)
           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))))
       (when-not (Thread/interrupted) 
         (recur)))
@@ -125,7 +151,8 @@
 
 (defn check-num-peers-equals-partitions 
   [{:keys [onyx/min-peers onyx/max-peers onyx/n-peers kafka/partition] :as task-map} n-partitions]
-  (let [fixed-partition? (and partition (= 1 max-peers))
+  (let [fixed-partition? (and partition (or (= 1 n-peers)
+                                            (= 1 max-peers)))
         all-partitions-covered? (or (= n-partitions min-peers max-peers)
                                     (= 1 n-partitions max-peers)
                                     (= n-partitions n-peers))] 
@@ -135,16 +162,15 @@
                         :n-peers n-peers
                         :min-peers min-peers
                         :max-peers max-peers
+                        :recoverable? false
                         :task-map task-map})] 
         (log/error e)
         (throw e)))))
 
 (defn start-kafka-consumer
   [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/log onyx.core/replica] :as event} lifecycle]
-  (let [{:keys [kafka/topic kafka/partition kafka/group-id]} task-map
+  (let [{:keys [kafka/topic kafka/partition kafka/group-id kafka/consumer-opts]} task-map
         brokers (find-brokers (:kafka/zookeeper task-map))
-        consumer-config {:bootstrap.servers brokers
-                         :group.id group-id}
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         client-id "onyx"
         retry-ch (:retry-ch pipeline)
@@ -153,12 +179,14 @@
         job-id (:onyx.core/job-id event)
         peer-id (:onyx.core/id event)
         task-id (:onyx.core/task-id event)
-        consumer-config {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
-                         :group.id group-id
-                         :enable.auto.commit false
-                         :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
-                                                   (:kafka/receive-buffer-bytes defaults))
-                         :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
+        consumer-config (merge
+                         {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
+                          :group.id group-id
+                          :enable.auto.commit false
+                          :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
+                                                    (:kafka/receive-buffer-bytes defaults))
+                          :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
+                         consumer-opts)
         key-deserializer (byte-array-deserializer)
         value-deserializer (byte-array-deserializer)
         consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
@@ -211,7 +239,7 @@
        (recur (dec n))))))
 
 (defrecord KafkaReadMessages
-  [max-pending batch-size batch-timeout pending-messages pending-commits drained? iter retry-ch segment-fn]
+  [task-map max-pending batch-size batch-timeout pending-messages pending-commits drained? iter retry-ch segment-fn]
   p-ext/Pipeline
   (write-batch
     [this event]
@@ -235,8 +263,9 @@
                  (or (not (empty? @pending-messages))
                      (not (empty? batch))))
         (if (:kafka/done-unsupported? event)
-          (throw (UnsupportedOperationException. ":done is not supported for auto assigned kafka partitions. 
-                                                  (:kafka/partition must be supplied)"))
+          (throw (ex-info ":done is not supported for auto assigned kafka partitions. (:kafka/partition must be supplied)"
+                          {:recoverable? false
+                           :task-map task-map}))
           (reset! drained? true)))
       {:onyx.core/batch batch}))
 
@@ -286,7 +315,7 @@
                                        (deserializer-fn (.value cr)))
                               :offset (.offset cr))))
         buffered-segments (atom nil)]
-    (->KafkaReadMessages max-pending batch-size batch-timeout
+    (->KafkaReadMessages task-map max-pending batch-size batch-timeout
                          pending-messages pending-commits drained? buffered-segments retry-ch segment-fn)))
 
 (defn close-read-messages
@@ -309,23 +338,25 @@
   (.close (:kafka/producer event)))
 
 (defn- message->producer-record
-  [{:keys [serializer-fn topic]} m]
+  [serializer-fn topic m]
   (let [message (:message m)
         k (some-> m :key serializer-fn)
         p (some-> m :partition int)
         message-topic (get m :topic topic)]
-    (cond
-      (nil? message)
-      (throw (ex-info "Payload is missing required :message!"
-                      {:payload m}))
-      (nil? message-topic)
-      (throw (ex-info
-              (str "Unable to write message payload to Kafka! "
-                   "Both :kafka/topic, and :topic in message payload "
-                   "are missing!")
-              {:payload m}))
-      :else
-      (ProducerRecord. message-topic p k (serializer-fn message)))))
+    (cond (not (contains? m :message))
+          (throw (ex-info "Payload is missing required. Need message key :message"
+                          {:recoverable? false
+                           :payload m}))
+
+          (nil? message-topic)
+          (throw (ex-info
+                  (str "Unable to write message payload to Kafka! "
+                       "Both :kafka/topic, and :topic in message payload "
+                       "are missing!")
+                  {:recoverable? false
+                   :payload m}))
+          :else
+          (ProducerRecord. message-topic p k (serializer-fn message)))))
 
 (defrecord KafkaWriteMessages [task-map config topic producer serializer-fn]
   p-ext/Pipeline
@@ -336,11 +367,11 @@
   (write-batch
     [this {:keys [onyx.core/results]}]
     (let [messages (mapcat :leaves (:tree results))]
-      (doall
-       (->> messages
-            (map (fn [msg]
-                   (send-async! producer (message->producer-record this (:message msg)))))
-            (run! deref)))
+      (->> messages
+           (map (fn [msg]
+                  (send-async! producer (message->producer-record serializer-fn topic (:message msg)))))
+           (doall)
+           (run! deref))
       {}))
 
   (seal-resource
@@ -352,8 +383,11 @@
 (defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
         request-size (or (get task-map :kafka/request-size) (get defaults :kafka/request-size))
-        config {:bootstrap.servers (vals (id->broker (:kafka/zookeeper task-map)))
-                :max.request.size request-size}
+        producer-opts (:kafka/producer-opts task-map)
+        config (merge
+                {:bootstrap.servers (vals (id->broker (:kafka/zookeeper task-map)))
+                 :max.request.size request-size}
+                producer-opts)
         topic (:kafka/topic task-map)
         key-serializer (byte-array-serializer)
         value-serializer (byte-array-serializer)
@@ -362,7 +396,9 @@
     (->KafkaWriteMessages task-map config topic producer serializer-fn)))
 
 (defn read-handle-exception [event lifecycle lf-kw exception]
-  :restart)
+  (if (false? (:recoverable? (ex-data exception)))
+    :kill
+    :restart))
 
 (def read-messages-calls
   {:lifecycle/before-task-start start-kafka-consumer
@@ -370,7 +406,9 @@
    :lifecycle/after-task-stop close-read-messages})
 
 (defn write-handle-exception [event lifecycle lf-kw exception]
-  :restart)
+  (if (false? (:recoverable? (ex-data exception)))
+    :kill
+    :restart))
 
 (def write-messages-calls
   {:lifecycle/before-task-start inject-write-messages
