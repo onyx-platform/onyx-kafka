@@ -13,6 +13,8 @@
             [franzy.common.metadata.protocols :as metadata]
             [franzy.clients.consumer.protocols :refer [assign-partitions! commit-offsets-sync!
                                                        poll! seek-to-offset!] :as cp]
+            [onyx.log.curator :as zk]
+            [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.default-vals :refer [arg-or-default]]
@@ -42,13 +44,29 @@
      x)
     :none))
 
+(defn checkpoint-str [id]
+  (str "/onyx/onyx-kafka/checkpoint/" id))
+
+;; Temporary until ABS
+(defn commit! [{:keys [conn opts prefix monitoring] :as log} chunk id]
+  (let [bytes (zookeeper-compress chunk)]
+    (let [node (checkpoint-str id) 
+          version (:version (zk/exists conn node))]
+      (if (nil? version)
+        (zk/create-all conn node :persistent? true :data bytes)
+        (zk/set-data conn node bytes version)))))
+
+(defn read-commit [{:keys [conn opts prefix monitoring] :as log} id]
+  (let [node (checkpoint-str id)]
+    (zookeeper-decompress (:data (zk/data conn node)))))
+
 (defn checkpoint-name [group-id topic assigned-partition]
   (format "%s-%s-%s" group-id topic assigned-partition))
 
 (defn checkpoint-or-beginning [log consumer topic kpartition group-id task-map]
   (let [k (checkpoint-name group-id topic kpartition)]
     (try
-      (let [offset (inc (:offset (extensions/read-chunk log :chunk k)))]
+      (let [offset (inc (:offset (read-commit log k)))]
         (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
       (catch org.apache.zookeeper.KeeperException$NoNodeException nne
         (if-let [start-offsets (:kafka/start-offsets task-map)]
@@ -117,7 +135,7 @@
       (when-let [offset (highest-offset-to-commit @pending-commits)]
         (let [k (checkpoint-name group-id topic kpartition)
               data {:offset offset}]
-          (extensions/force-write-chunk log :chunk data k)
+          (commit! log data k)
           (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))))
       (when-not (Thread/interrupted) 
         (recur)))
