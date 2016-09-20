@@ -19,7 +19,6 @@
             [onyx.api]
             [taoensso.timbre :as log]))
 
-
 (def compress-opts {:v1-compatibility? false :compressor nil :encryptor nil :password nil})
 
 (defn compress [x]
