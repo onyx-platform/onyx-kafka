@@ -44,7 +44,7 @@
               :optional? true}
 
              :kafka/consumer-opts
-             {:doc "A map of arbitrary configuration to merge into the underlying Kafka consumer base configuration."
+             {:doc "A map of arbitrary configuration to merge into the underlying Kafka consumer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#newconsumerconfigs). Please note that key values such as `fetch.min.bytes` must be in keyword form, i.e. `:fetch.min.bytes`."
               :type :map
               :optional? true}
 
@@ -111,7 +111,7 @@
               :type :keyword}
 
              :kafka/producer-opts
-             {:doc "A map of arbitrary configuration to merge into the underlying Kafka producer base configuration."
+             {:doc "A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`."
               :type :map
               :optional? true}
 
