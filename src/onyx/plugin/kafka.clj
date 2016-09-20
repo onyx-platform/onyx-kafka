@@ -69,15 +69,20 @@
       (let [offset (inc (:offset (read-commit log k)))]
         (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
       (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-        (if-let [start-offsets (:kafka/start-offsets task-map)]
-          (let [offset (get start-offsets kpartition)]
-            (when-not offset
-              (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
-                              {:missing-partition kpartition
-                               :recoverable? false
-                               :kafka/start-offsets start-offsets})))
-            (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
-          (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))
+        (try
+         ;; Try again using 0.9.9.0/0.9.10.0 checkpoint method
+         ;; This allows users to transition to new checkpoint from old method
+         (let [offset (inc (:offset (extensions/read-chunk log :chunk k)))]
+           (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
+         (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+           (if-let [start-offsets (:kafka/start-offsets task-map)]
+             (let [offset (get start-offsets kpartition)]
+               (when-not offset
+                 (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
+                                 {:missing-partition kpartition
+                                  :kafka/start-offsets start-offsets})))
+               (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
+             (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))))
 
 (defn seek-offset! [log consumer group-id topic kpartition task-map]
   (if (and (:kafka/force-reset? task-map)
