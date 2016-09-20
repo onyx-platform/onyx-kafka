@@ -346,6 +346,7 @@
        (->> messages
             (map (fn [msg]
                    (send-async! producer (message->producer-record this (:message msg)))))
+            (doall)
             (run! deref)))
       {}))
 
