@@ -320,16 +320,18 @@
         k (some-> m :key serializer-fn)
         p (some-> m :partition int)
         message-topic (get m :topic topic)]
-    (cond (nil? message)
+    (cond (not (contains? m :message))
           (throw (ex-info "Payload is missing required. Need message key :message"
-                          {:payload m}))
+                          {:recoverable? false
+                           :payload m}))
 
           (nil? message-topic)
           (throw (ex-info
                   (str "Unable to write message payload to Kafka! "
                        "Both :kafka/topic, and :topic in message payload "
                        "are missing!")
-                  {:payload m}))
+                  {:recoverable? false
+                   :payload m}))
           :else
           (ProducerRecord. message-topic p k (serializer-fn message)))))
 
