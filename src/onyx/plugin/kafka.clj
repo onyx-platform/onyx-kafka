@@ -56,6 +56,7 @@
             (when-not offset
               (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
                               {:missing-partition kpartition
+                               :recoverable? false
                                :kafka/start-offsets start-offsets})))
             (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
           (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))
@@ -71,7 +72,8 @@
             (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}])
 
             :else
-            (throw (ex-info "Tried to seek to unknown policy" {:policy policy}))))
+            (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
+                                                               :policy policy}))))
     (checkpoint-or-beginning log consumer topic kpartition group-id task-map)))
 
 (defn log-id [replica-val job-id peer-id task-id]
@@ -97,7 +99,8 @@
     (if (seq results)
       results
       (throw (ex-info "Could not locate any Kafka brokers to connect to."
-                      {:zk-addr zk-addr})))))
+                      {:recoverable? true
+                       :zk-addr zk-addr})))))
 
 (defn highest-offset-to-commit [offsets]
   (->> (sort offsets)
@@ -136,6 +139,7 @@
                         :n-peers n-peers
                         :min-peers min-peers
                         :max-peers max-peers
+                        :recoverable? false
                         :task-map task-map})] 
         (log/error e)
         (throw e)))))
@@ -212,7 +216,7 @@
        (recur (dec n))))))
 
 (defrecord KafkaReadMessages
-  [max-pending batch-size batch-timeout pending-messages pending-commits drained? iter retry-ch segment-fn]
+  [task-map max-pending batch-size batch-timeout pending-messages pending-commits drained? iter retry-ch segment-fn]
   p-ext/Pipeline
   (write-batch
     [this event]
@@ -236,8 +240,9 @@
                  (or (not (empty? @pending-messages))
                      (not (empty? batch))))
         (if (:kafka/done-unsupported? event)
-          (throw (UnsupportedOperationException. ":done is not supported for auto assigned kafka partitions. 
-                                                  (:kafka/partition must be supplied)"))
+          (throw (ex-info ":done is not supported for auto assigned kafka partitions. (:kafka/partition must be supplied)"
+                          {:recoverable? false
+                           :task-map task-map}))
           (reset! drained? true)))
       {:onyx.core/batch batch}))
 
@@ -287,7 +292,7 @@
                                        (deserializer-fn (.value cr)))
                               :offset (.offset cr))))
         buffered-segments (atom nil)]
-    (->KafkaReadMessages max-pending batch-size batch-timeout
+    (->KafkaReadMessages task-map max-pending batch-size batch-timeout
                          pending-messages pending-commits drained? buffered-segments retry-ch segment-fn)))
 
 (defn close-read-messages
@@ -315,18 +320,18 @@
         k (some-> m :key serializer-fn)
         p (some-> m :partition int)
         message-topic (get m :topic topic)]
-    (cond
-      (nil? message)
-      (throw (ex-info "Payload is missing required :message!"
-                      {:payload m}))
-      (nil? message-topic)
-      (throw (ex-info
-              (str "Unable to write message payload to Kafka! "
-                   "Both :kafka/topic, and :topic in message payload "
-                   "are missing!")
-              {:payload m}))
-      :else
-      (ProducerRecord. message-topic p k (serializer-fn message)))))
+    (cond (nil? message)
+          (throw (ex-info "Payload is missing required. Need message key :message"
+                          {:payload m}))
+
+          (nil? message-topic)
+          (throw (ex-info
+                  (str "Unable to write message payload to Kafka! "
+                       "Both :kafka/topic, and :topic in message payload "
+                       "are missing!")
+                  {:payload m}))
+          :else
+          (ProducerRecord. message-topic p k (serializer-fn message)))))
 
 (defrecord KafkaWriteMessages [task-map config topic producer serializer-fn]
   p-ext/Pipeline
@@ -366,7 +371,9 @@
     (->KafkaWriteMessages task-map config topic producer serializer-fn)))
 
 (defn read-handle-exception [event lifecycle lf-kw exception]
-  :restart)
+  (if (false? (:recoverable? (ex-data exception)))
+    :kill
+    :restart))
 
 (def read-messages-calls
   {:lifecycle/before-task-start start-kafka-consumer
@@ -374,7 +381,9 @@
    :lifecycle/after-task-stop close-read-messages})
 
 (defn write-handle-exception [event lifecycle lf-kw exception]
-  :restart)
+  (if (false? (:recoverable? (ex-data exception)))
+    :kill
+    :restart))
 
 (def write-messages-calls
   {:lifecycle/before-task-start inject-write-messages
