@@ -19,6 +19,7 @@
    {:bootstrap.servers (vals (id->broker zk-addr))
     :group.id "onyx-consumer"
     :auto.offset.reset :earliest
+    :receive.buffer.bytes 65536
     :enable.auto.commit false}
    (byte-array-deserializer)
    (byte-array-deserializer)))
@@ -36,13 +37,12 @@
   ([zk-addr topic decompress-fn] (take-until-done zk-addr topic decompress-fn {}))
   ([zk-addr topic decompress-fn opts]
    (log/info {:msg "Taking until done..." :topic topic})
-   (timeout 5000
+   (timeout (or (:timeout opts) 5000)
      (let [c (make-consumer zk-addr)]
        (assign-partitions! c [{:topic topic :partition 0}])
        (loop [results []]
-         (let [msgs (into [] (poll! c))
-               segments
-               (map #(consumer-record->message decompress-fn %) msgs)]
+         (let [msgs (into [] (poll! c {:poll-timeout-ms 500}))
+               segments (map #(consumer-record->message decompress-fn %) msgs)]
            (if (= :done (:value (last segments)))
              (into results (butlast segments))
              (recur (into results segments)))))))))
@@ -54,7 +54,7 @@
   (log/info {:msg "Taking now..." :topic topic})
   (let [c (make-consumer zk-addr)]
     (assign-partitions! c [{:topic topic :partition 0}])
-    (mapv #(consumer-record->message decompress-fn %) (poll! c))))
+    (mapv #(consumer-record->message decompress-fn %) (poll! c {:poll-timeout-ms 5000}))))
 
 (defn take-segments
   "Reads segments from a topic until a :done is reached."

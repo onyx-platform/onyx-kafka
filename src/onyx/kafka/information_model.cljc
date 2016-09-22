@@ -43,6 +43,11 @@
               :default 65536
               :optional? true}
 
+             :kafka/consumer-opts
+             {:doc "A map of arbitrary configuration to merge into the underlying Kafka consumer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#newconsumerconfigs). Please note that key values such as `fetch.min.bytes` must be in keyword form, i.e. `:fetch.min.bytes`."
+              :type :map
+              :optional? true}
+
              :kafka/fetch-size
              {:doc "The size in bytes to request from ZooKeeper per fetch request."
               :type :long
@@ -105,6 +110,11 @@
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment."
               :type :keyword}
 
+             :kafka/producer-opts
+             {:doc "A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`."
+              :type :map
+              :optional? true}
+
              :kafka/no-seal?
              {:doc "Do not write :done to the topic when task receives the sentinel signal (end of batch job)."
               :type :boolean
@@ -135,6 +145,7 @@
      :kafka/commit-interval
      :kafka/wrap-with-metadata?
      :kafka/start-offsets
+     :kafka/consumer-opts
      :kafka/empty-read-back-off
      :kafka/fetch-size
      :kafka/chan-capacity]
@@ -145,4 +156,5 @@
      :kafka/partition
      :kafka/serializer-fn
      :kafka/request-size
-     :kafka/no-seal?]}})
+     :kafka/no-seal?
+     :kafka/producer-opts]}})
