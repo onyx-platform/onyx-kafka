@@ -63,10 +63,11 @@
 (defn checkpoint-name [group-id topic assigned-partition]
   (format "%s-%s-%s" group-id topic assigned-partition))
 
-(defn checkpoint-or-beginning [log consumer topic kpartition group-id task-map]
+(defn checkpoint-or-beginning [log-prefix log consumer topic kpartition group-id task-map]
   (let [k (checkpoint-name group-id topic kpartition)]
     (try
       (let [offset (inc (:offset (read-commit log k)))]
+        (info log-prefix "Seeking to checkpointed offset at:" offset)
         (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
       (catch org.apache.zookeeper.KeeperException$NoNodeException nne
         (try
@@ -84,20 +85,24 @@
                (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
              (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))))
 
-(defn seek-offset! [log consumer group-id topic kpartition task-map]
+(defn seek-offset! [log-prefix log consumer group-id topic kpartition task-map]
   (if (and (:kafka/force-reset? task-map)
            (not (:kafka/start-offset task-map)))
     (let [policy (:kafka/offset-reset task-map)]
       (cond (= policy :smallest)
-            (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}])
+            (do
+             (info log-prefix "Seeking to beginning offset on topic" {:topic topic :partition kpartition})
+             (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
 
             (= policy :largest)
-            (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}])
+            (do
+             (info log-prefix "Seeking to end offset on topic" {:topic topic :partition kpartition})
+             (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
 
             :else
             (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
                                                                :policy policy}))))
-    (checkpoint-or-beginning log consumer topic kpartition group-id task-map)))
+    (checkpoint-or-beginning log-prefix log consumer topic kpartition group-id task-map)))
 
 (defn log-id [replica-val job-id peer-id task-id]
   (get-in replica-val [:task-slot-ids job-id task-id peer-id]))
@@ -168,7 +173,7 @@
         (throw e)))))
 
 (defn start-kafka-consumer
-  [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/log onyx.core/replica] :as event} lifecycle]
+  [{:keys [onyx.core/task-map onyx.core/pipeline onyx.core/log onyx.core/replica onyx.core/compiled] :as event} lifecycle]
   (let [{:keys [kafka/topic kafka/partition kafka/group-id kafka/consumer-opts]} task-map
         brokers (find-brokers (:kafka/zookeeper task-map))
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
@@ -199,7 +204,7 @@
                                (not (:kafka/partition task-map)))
         _ (check-num-peers-equals-partitions task-map n-partitions)
         _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
-        _ (seek-offset! log consumer group-id topic kpartition task-map)
+        _ (seek-offset! (:log-prefix compiled) log consumer group-id topic kpartition task-map)
         offset (cp/next-offset consumer {:topic topic :partition kpartition})
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
         commit-fut (future (commit-loop log group-id topic kpartition commit-interval pending-commits))]
