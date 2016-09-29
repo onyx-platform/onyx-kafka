@@ -1,3 +1,7 @@
+#### 0.9.11.0
+* **BREAKING CHANGE** `:kafka/offset-reset` `:smallest` was renamed to `:earliest`, `:largest` was renamed to `:latest`
+* *WARNING*, task-maps are now schema validated for correctness at run-time.
+
 #### 0.9.10.1
 * **Major bug fix** Resumption of checkpointing was only occurring between jobs using the same `:onyx/tenancy-id`.
 * Added ability to pass in arbitrary consumer and producer options via `:kafka/producer-opts` and `:kakfa/consumer-opts`

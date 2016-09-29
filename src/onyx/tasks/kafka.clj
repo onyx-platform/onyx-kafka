@@ -21,7 +21,7 @@
   {:kafka/topic s/Str
    :kafka/group-id s/Str
    :kafka/zookeeper s/Str
-   :kafka/offset-reset (s/enum :smallest :largest :earliest :latest)
+   :kafka/offset-reset (s/enum :earliest :latest)
    :kafka/force-reset? s/Bool
    :kafka/deserializer-fn os/NamespacedKeyword
    (s/optional-key :kafka/consumer-opts) {s/Any s/Any}

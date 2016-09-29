@@ -39,15 +39,6 @@
    :kafka/commit-interval 2000
    :kafka/wrap-with-metadata? false})
 
-(defn get-offset-reset [task-map x]
-  (if (:kafka/force-reset? task-map)
-    ({:earliest :earliest
-      :latest :latest
-      :smallest :earliest
-      :largest :latest}
-     x)
-    :none))
-
 (defn checkpoint-str [id]
   (str "/onyx/onyx-kafka/checkpoint/" id))
 
@@ -92,7 +83,7 @@
 (defn seek-offset! [log-prefix log consumer group-id topic kpartition task-map]
   (if (and (:kafka/force-reset? task-map)
            (not (:kafka/start-offset task-map)))
-    (let [policy (get-offset-reset task-map (:kafka/offset-reset task-map))]
+    (let [policy (:kafka/offset-reset task-map)]
       (cond (= policy :earliest)
             (do
              (info log-prefix "Seeking to beginning offset on topic" {:topic topic :partition kpartition})
@@ -188,13 +179,14 @@
         job-id (:onyx.core/job-id event)
         peer-id (:onyx.core/id event)
         task-id (:onyx.core/task-id event)
+        _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
         consumer-config (merge
                          {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
                           :group.id group-id
                           :enable.auto.commit false
                           :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
                                                     (:kafka/receive-buffer-bytes defaults))
-                          :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
+                          :auto.offset.reset (:kafka/offset-reset task-map)}
                          consumer-opts)
         key-deserializer (byte-array-deserializer)
         value-deserializer (byte-array-deserializer)
@@ -207,7 +199,6 @@
         done-unsupported? (and (> (count partitions) 1)
                                (not (:kafka/partition task-map)))
         _ (check-num-peers-equals-partitions task-map n-partitions)
-        _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
         _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
         _ (seek-offset! (:log-prefix compiled) log consumer group-id topic kpartition task-map)
         offset (cp/next-offset consumer {:topic topic :partition kpartition})

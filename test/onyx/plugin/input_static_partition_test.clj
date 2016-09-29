@@ -30,7 +30,7 @@
                                (merge {:kafka/topic topic
                                        :kafka/group-id "onyx-consumer"
                                        :kafka/zookeeper zk-address
-                                       :kafka/offset-reset :smallest
+                                       :kafka/offset-reset :earliest
                                        :kafka/force-reset? true
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                        :onyx/min-peers 1
