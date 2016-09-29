@@ -65,9 +65,11 @@
        (inc (:offset (read-commit log k)))
        (catch org.apache.zookeeper.KeeperException$NoNodeException nne
          (try
-          ;; Try again using 0.9.9.0/0.9.10.0 checkpoint method
-          ;; This allows users to transition to new checkpoint from old method
-          (inc (:offset (extensions/read-chunk log :chunk k)))
+          (when-let [offset (:offset (extensions/read-chunk log :chunk k))]
+            (throw (ex-info "Offset was found at the old checkpoint path.
+                             Please set :kafka/force-reset? or resume manually with :kafka/start-offsets"
+                            {:partition kpartition
+                             :offset offset})))
           (catch org.apache.zookeeper.KeeperException$NoNodeException nne
             (if-let [start-offsets (:kafka/start-offsets task-map)]
               (let [offset (get start-offsets kpartition)]
