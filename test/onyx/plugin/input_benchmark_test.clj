@@ -75,7 +75,7 @@
                             {:kafka/topic topic
                              :kafka/group-id "onyx-consumer-1"
                              :kafka/zookeeper zk-address
-                             :kafka/offset-reset :smallest
+                             :kafka/offset-reset :earliest
                              :kafka/force-reset? true
                              :kafka/receive-buffer-bytes 65536
                              :kafka/deserializer-fn ::decompress

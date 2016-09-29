@@ -44,7 +44,7 @@ Catalog entry:
  :kafka/group-id "onyx-consumer"
  :kafka/receive-buffer-bytes 65536
  :kafka/zookeeper "127.0.0.1:2181"
- :kafka/offset-reset :smallest
+ :kafka/offset-reset :earliest
  :kafka/force-reset? true
  :kafka/commit-interval 500
  :kafka/deserializer-fn :my.ns/deserializer-fn
@@ -72,7 +72,7 @@ Lifecycle entry:
 |`:kafka/partition`           | `string`  |         | Optional: partition to read from if auto-assignment is not used
 |`:kafka/group-id`            | `string`  |         | The consumer identity to store in ZooKeeper
 |`:kafka/zookeeper`           | `string`  |         | The ZooKeeper connection string
-|`:kafka/offset-reset`        | `keyword` |         | Offset bound to seek to when not found - `:smallest` or `:largest`
+|`:kafka/offset-reset`        | `keyword` |         | Offset bound to seek to when not found - `:earliest` or `:latest`
 |`:kafka/force-reset?`        | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the last acknowledged messsage if it exists
 |`:kafka/receive-buffer-bytes`| `integer` |`65536`  | The size in the receive buffer in the Kafka consumer.
 |`:kafka/commit-interval`     | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
