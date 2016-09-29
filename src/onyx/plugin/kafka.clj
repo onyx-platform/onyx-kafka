@@ -24,6 +24,8 @@
             [onyx.static.util :refer [kw->fn]]
             [onyx.extensions :as extensions]
             [onyx.types :as t]
+            [onyx.tasks.kafka]
+            [schema.core :as s]
             [onyx.api])
   (:import (org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord)
            (org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer)
@@ -36,13 +38,6 @@
   {:kafka/receive-buffer-bytes 65536
    :kafka/commit-interval 2000
    :kafka/wrap-with-metadata? false})
-
-(defn get-offset-reset [task-map x]
-  (if (:kafka/force-reset? task-map)
-    ({:smallest :earliest
-      :largest :latest}
-     x)
-    :none))
 
 (defn checkpoint-str [id]
   (str "/onyx/onyx-kafka/checkpoint/" id))
@@ -89,12 +84,12 @@
   (if (and (:kafka/force-reset? task-map)
            (not (:kafka/start-offset task-map)))
     (let [policy (:kafka/offset-reset task-map)]
-      (cond (= policy :smallest)
+      (cond (= policy :earliest)
             (do
              (info log-prefix "Seeking to beginning offset on topic" {:topic topic :partition kpartition})
              (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
 
-            (= policy :largest)
+            (= policy :latest)
             (do
              (info log-prefix "Seeking to end offset on topic" {:topic topic :partition kpartition})
              (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
@@ -184,13 +179,14 @@
         job-id (:onyx.core/job-id event)
         peer-id (:onyx.core/id event)
         task-id (:onyx.core/task-id event)
+        _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
         consumer-config (merge
                          {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
                           :group.id group-id
                           :enable.auto.commit false
                           :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
                                                     (:kafka/receive-buffer-bytes defaults))
-                          :auto.offset.reset (get-offset-reset task-map (:kafka/offset-reset task-map))}
+                          :auto.offset.reset (:kafka/offset-reset task-map)}
                          consumer-opts)
         key-deserializer (byte-array-deserializer)
         value-deserializer (byte-array-deserializer)
@@ -387,6 +383,7 @@
 
 (defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
+        _ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         request-size (or (get task-map :kafka/request-size) (get defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
         config (merge

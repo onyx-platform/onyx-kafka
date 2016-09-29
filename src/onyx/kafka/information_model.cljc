@@ -22,7 +22,8 @@
               :type :string}
 
              :kafka/offset-reset
-             {:doc "Offset bound to seek to when not found - `:smallest` or `:largest`."
+             {:doc "Offset bound to seek to when not found - `:earliest` or `:latest`."
+              :choices [:earliest :latest]
               :type :keyword}
 
              :kafka/force-reset?
