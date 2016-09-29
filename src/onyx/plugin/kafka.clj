@@ -24,6 +24,8 @@
             [onyx.static.util :refer [kw->fn]]
             [onyx.extensions :as extensions]
             [onyx.types :as t]
+            [onyx.tasks.kafka]
+            [schema.core :as s]
             [onyx.api])
   (:import (org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord)
            (org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer)
@@ -39,7 +41,9 @@
 
 (defn get-offset-reset [task-map x]
   (if (:kafka/force-reset? task-map)
-    ({:smallest :earliest
+    ({:earliest :earliest
+      :latest :latest
+      :smallest :earliest
       :largest :latest}
      x)
     :none))
@@ -88,13 +92,13 @@
 (defn seek-offset! [log-prefix log consumer group-id topic kpartition task-map]
   (if (and (:kafka/force-reset? task-map)
            (not (:kafka/start-offset task-map)))
-    (let [policy (:kafka/offset-reset task-map)]
-      (cond (= policy :smallest)
+    (let [policy (get-offset-reset task-map (:kafka/offset-reset task-map))]
+      (cond (= policy :earliest)
             (do
              (info log-prefix "Seeking to beginning offset on topic" {:topic topic :partition kpartition})
              (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
 
-            (= policy :largest)
+            (= policy :latest)
             (do
              (info log-prefix "Seeking to end offset on topic" {:topic topic :partition kpartition})
              (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
@@ -203,6 +207,7 @@
         done-unsupported? (and (> (count partitions) 1)
                                (not (:kafka/partition task-map)))
         _ (check-num-peers-equals-partitions task-map n-partitions)
+        _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
         _ (assign-partitions! consumer [{:topic topic :partition kpartition}])
         _ (seek-offset! (:log-prefix compiled) log consumer group-id topic kpartition task-map)
         offset (cp/next-offset consumer {:topic topic :partition kpartition})
@@ -387,6 +392,7 @@
 
 (defn write-messages [pipeline-data]
   (let [task-map (:onyx.core/task-map pipeline-data)
+        _ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         request-size (or (get task-map :kafka/request-size) (get defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
         config (merge
