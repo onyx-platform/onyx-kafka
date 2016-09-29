@@ -1,3 +1,6 @@
+#### 0.9.11.1
+* Major bug fix: `:kafka/offset-reset` was ignored unless `:kafka/force-reset?` was set.
+
 #### 0.9.11.0
 * **BREAKING CHANGE** `:kafka/offset-reset` `:smallest` was renamed to `:earliest`, `:largest` was renamed to `:latest`
 * *WARNING*, task-maps are now schema validated for correctness at run-time.
