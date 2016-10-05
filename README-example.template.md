@@ -37,7 +37,8 @@ In your peer boot-up namespace:
 ```onyx-gen-doc
 {:display :catalog-entry
  :model :onyx.plugin.kafka/read-messages
- :merge-additions {}}
+ :merge-additions {:kafka/consumer-opts {}
+                   :kafka/start-offsets {0 50 1 90}}}
 ```
 
 ```onyx-gen-doc
@@ -57,7 +58,7 @@ In your peer boot-up namespace:
 ```onyx-gen-doc
 {:display :catalog-entry
  :model :onyx.plugin.kafka/write-messages
- :merge-additions {}}
+ :merge-additions {:request-size 104857600}}
 ```
 
 ```onyx-gen-doc
