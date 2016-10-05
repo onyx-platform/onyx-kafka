@@ -31,7 +31,7 @@ In your peer boot-up namespace:
 ```onyx-gen-doc
 {:display :attribute-table
  :model :onyx.plugin.kafka/read-messages
- :columns [[:key "Key"] [:type "Type"] [:default "Default"] [:doc "Description"]]}
+ :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]}
 ```
 
 ```onyx-gen-doc
@@ -63,7 +63,7 @@ In your peer boot-up namespace:
 ```onyx-gen-doc
 {:display :attribute-table
  :model :onyx.plugin.kafka/write-messages
- :columns [[:key "Key"] [:type "Type"] [:default "Default"] [:doc "Description"]]}
+ :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]}
 ```
 
 ```onyx-gen-doc
