@@ -20,10 +20,12 @@ In your peer boot-up namespace:
 
 ### Task Bundles
 
+#### `:onyx.plugin.kafka/read-messages`
+
 ```onyx-gen-doc
 {:display :summary
  :model :onyx.plugin.kafka/read-messages
- :format :h4}
+ :format :h6}
 ```
 
 ```onyx-gen-doc
@@ -44,10 +46,12 @@ In your peer boot-up namespace:
  :merge-additions {}}
 ```
 
+#### `:onyx.plugin.kafka/write-messages`
+
 ```onyx-gen-doc
 {:display :summary
  :model :onyx.plugin.kafka/write-messages
- :format :h4}
+ :format :h6}
 ```
 
 ```onyx-gen-doc

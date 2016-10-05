@@ -1,4 +1,4 @@
-[//]: # ({:display :header, :valid-structure? true, :rendered-params ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h4} {:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default"] [:doc "Description"]]} {:display :catalog-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h4} {:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}} {:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default"] [:doc "Description"]]} {:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})})
+[//]: # ({:display :header, :valid-structure? true, :rendered-params ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6} {:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default"] [:doc "Description"]]} {:display :catalog-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6} {:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}} {:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default"] [:doc "Description"]]} {:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})})
 [//]: # (✔ All catalog entries documented.)
 [//]: # (✔ All lifecycle entries documented.)
 ## onyx-kafka
@@ -23,8 +23,10 @@ In your peer boot-up namespace:
 
 ### Task Bundles
 
-[//]: # ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h4})
-#### An input task to read messages from a Kafka topic.
+#### `:onyx.plugin.kafka/read-messages`
+
+[//]: # ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6})
+###### An input task to read messages from a Kafka topic.
 
 [//]: # ({:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default"] [:doc "Description"]]})
 
@@ -69,8 +71,10 @@ In your peer boot-up namespace:
   :lifecycle/calls :onyx.plugin.kafka/read-messages-calls}]
 ```
 
-[//]: # ({:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h4})
-#### Write messages to kafka.
+#### `:onyx.plugin.kafka/write-messages`
+
+[//]: # ({:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6})
+###### Write messages to kafka.
 
 [//]: # ({:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})
 ```clojure
