@@ -13,7 +13,7 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx-gen-doc "0.9.11.0"]
+                 [org.onyxplatform/onyx "0.9.11"]
                  [ymilky/franzy "0.0.1"]
                  [ymilky/franzy-admin "0.0.1" :exclusions [org.slf4j/slf4j-log4j12]]
                  [com.stuartsierra/component "0.2.3"]]
@@ -21,26 +21,29 @@
                    :broker-reboot :broker-reboot
                    :benchmark :benchmark
                    :all (constantly true)}
-  :profiles {:dev {:dependencies [[cheshire "5.5.0"]
-                                  [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
-                                  [aero "0.2.0"]
-                                  [prismatic/schema "1.0.5"]
-                                  [ymilky/franzy-embedded "0.0.1" :exclusions [org.slf4j/slf4j-log4j12]]] 
-                   :plugins [[lein-set-version "0.4.1"]
-                             [lein-update-dependency "0.1.2"]
-                             [lein-pprint "1.1.1"]
-                             [org.onyxplatform/lein-onyx-gen-doc "0.9.11.0"]]
-                   :global-vars  {*warn-on-reflection* true
-                                  *assert* false
-                                  *unchecked-math* :warn-on-boxed}
-                   :java-opts ^:replace ["-server"
-                                         "-Xmx4g"
-                                         "-Daeron.client.liveness.timeout=50000000000"
-                                         "-XX:+UnlockCommercialFeatures" 
-                                         "-XX:+FlightRecorder"
-                                         "-XX:+UnlockDiagnosticVMOptions"
-                                         "-XX:StartFlightRecording=duration=240s,filename=localrecording.jfr"]
-                   :onyx-gen-doc {:information-model onyx.kafka.information-model/model
-                                  :in-path "README-example.template.md"
-                                  :out-path "README-example.md"
-                                  :verbose? true}}})
+  :profiles
+  {:dev
+   {:dependencies [[cheshire "5.5.0"]
+                   [org.onyxplatform/onyx-gen-doc "0.9.11.0"]
+                   [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
+                   [aero "0.2.0"]
+                   [prismatic/schema "1.0.5"]
+                   [ymilky/franzy-embedded "0.0.1" :exclusions [org.slf4j/slf4j-log4j12]]] 
+    :plugins [[lein-set-version "0.4.1"]
+              [lein-update-dependency "0.1.2"]
+              [lein-pprint "1.1.1"]
+              [org.onyxplatform/lein-onyx-gen-doc "0.9.11.0"]]
+    :global-vars  {*warn-on-reflection* true
+                   *assert* false
+                   *unchecked-math* :warn-on-boxed}
+    :java-opts ^:replace ["-server"
+                          "-Xmx4g"
+                          "-Daeron.client.liveness.timeout=50000000000"
+                          "-XX:+UnlockCommercialFeatures" 
+                          "-XX:+FlightRecorder"
+                          "-XX:+UnlockDiagnosticVMOptions"
+                          "-XX:StartFlightRecording=duration=240s,filename=localrecording.jfr"]
+    :onyx-gen-doc {:information-model onyx.kafka.information-model/model
+                   :in-path "README-example.template.md"
+                   :out-path "README-example.md"
+                   :verbose? true}}})
