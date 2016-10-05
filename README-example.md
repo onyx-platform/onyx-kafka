@@ -1,4 +1,4 @@
-[//]: # ({:display :header, :valid-structure? true, :rendered-params ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6} {:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :catalog-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {:kafka/consumer-opts {}, :kafka/start-offsets {0 50, 1 90}}} {:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6} {:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:kafka/producer-opts {}, :kafka/request-size 104857600}} {:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})})
+[//]: # ({:display :header, :valid-structure? true, :rendered-params ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6} {:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :catalog-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {:kafka/consumer-opts {}, :kafka/start-offsets {0 50, 1 90}}} {:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6} {:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:kafka/producer-opts {}, :kafka/request-size 104857600}} {:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})})
 [//]: # (✔ All catalog entries documented.)
 [//]: # (✔ All lifecycle entries documented.)
 ## onyx-kafka
@@ -27,6 +27,8 @@ In your peer boot-up namespace:
 
 [//]: # ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6})
 ###### An input task to read messages from a Kafka topic.
+
+##### Catalog
 
 [//]: # ({:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]})
 
@@ -65,6 +67,8 @@ In your peer boot-up namespace:
  :kafka/consumer-opts {}}
 ```
 
+##### Lifecycles
+
 [//]: # ({:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}})
 ```clojure
 [{:task.lifecycle/name :read-messages,
@@ -75,6 +79,21 @@ In your peer boot-up namespace:
 
 [//]: # ({:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6})
 ###### Write messages to kafka.
+
+##### Catalog
+
+[//]: # ({:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]})
+
+| Key                    | Type       | Default | Description                                                                                                                                                                                                                                                                                                                                                                                        |
+|----------------------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `:kafka/topic`         | `:string`  |         | The topic name to write to. Must either be supplied or otherwise all messages must contain a `:topic` key                                                                                                                                                                                                                                                                                          |
+| `:kafka/zookeeper`     | `:string`  |         | The ZooKeeper connection string.                                                                                                                                                                                                                                                                                                                                                                   |
+| `:kafka/partition`     | `:string`  |         | Partition to write to, if you do not wish messages to be auto allocated to partitions. Must either be supplied in the task map, or all messages should contain a `:partition` key.                                                                                                                                                                                                                 |
+| `:kafka/serializer-fn` | `:keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment.                                                                                                                                                                                                                                                                          |
+| `:kafka/request-size`  | `:long`    |         | The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer.                                                                                                                                                                                                                                                                                        |
+| `:kafka/no-seal?`      | `:boolean` | `false` | Do not write :done to the topic when task receives the sentinel signal (end of batch job).                                                                                                                                                                                                                                                                                                         |
+| `:kafka/producer-opts` | `:map`     |         | A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`. Values in this map get maximum priority. |
+
 
 [//]: # ({:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:kafka/producer-opts {}, :kafka/request-size 104857600}})
 ```clojure
@@ -89,18 +108,7 @@ In your peer boot-up namespace:
  :kafka/producer-opts {}}
 ```
 
-[//]: # ({:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]})
-
-| Key                    | Type       | Default | Description                                                                                                                                                                                                                                                                                                                                                                                        |
-|----------------------- | ---------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `:kafka/topic`         | `:string`  |         | The topic name to write to. Must either be supplied or otherwise all messages must contain a `:topic` key                                                                                                                                                                                                                                                                                          |
-| `:kafka/zookeeper`     | `:string`  |         | The ZooKeeper connection string.                                                                                                                                                                                                                                                                                                                                                                   |
-| `:kafka/partition`     | `:string`  |         | Partition to write to, if you do not wish messages to be auto allocated to partitions. Must either be supplied in the task map, or all messages should contain a `:partition` key.                                                                                                                                                                                                                 |
-| `:kafka/serializer-fn` | `:keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment.                                                                                                                                                                                                                                                                          |
-| `:kafka/request-size`  | `:long`    |         | The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer.                                                                                                                                                                                                                                                                                        |
-| `:kafka/no-seal?`      | `:boolean` | `false` | Do not write :done to the topic when task receives the sentinel signal (end of batch job).                                                                                                                                                                                                                                                                                                         |
-| `:kafka/producer-opts` | `:map`     |         | A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`. Values in this map get maximum priority. |
-
+##### Lifecycles
 
 [//]: # ({:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})
 ```clojure

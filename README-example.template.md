@@ -28,6 +28,8 @@ In your peer boot-up namespace:
  :format :h6}
 ```
 
+##### Catalog
+
 ```onyx-gen-doc
 {:display :attribute-table
  :model :onyx.plugin.kafka/read-messages
@@ -40,6 +42,8 @@ In your peer boot-up namespace:
  :merge-additions {:kafka/consumer-opts {}
                    :kafka/start-offsets {0 50 1 90}}}
 ```
+
+##### Lifecycles
 
 ```onyx-gen-doc
 {:display :lifecycle-entry
@@ -55,6 +59,14 @@ In your peer boot-up namespace:
  :format :h6}
 ```
 
+##### Catalog
+
+```onyx-gen-doc
+{:display :attribute-table
+ :model :onyx.plugin.kafka/write-messages
+ :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]}
+```
+
 ```onyx-gen-doc
 {:display :catalog-entry
  :model :onyx.plugin.kafka/write-messages
@@ -62,11 +74,7 @@ In your peer boot-up namespace:
                    :kafka/request-size 104857600}}
 ```
 
-```onyx-gen-doc
-{:display :attribute-table
- :model :onyx.plugin.kafka/write-messages
- :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]}
-```
+##### Lifecycles
 
 ```onyx-gen-doc
 {:display :lifecycle-entry
