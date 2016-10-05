@@ -58,7 +58,8 @@ In your peer boot-up namespace:
 ```onyx-gen-doc
 {:display :catalog-entry
  :model :onyx.plugin.kafka/write-messages
- :merge-additions {:request-size 104857600}}
+ :merge-additions {:kafka/producer-opts {}
+                   :kafka/request-size 104857600}}
 ```
 
 ```onyx-gen-doc

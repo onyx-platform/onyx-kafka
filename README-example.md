@@ -1,4 +1,4 @@
-[//]: # ({:display :header, :valid-structure? true, :rendered-params ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6} {:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :catalog-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {:kafka/consumer-opts {}, :kafka/start-offsets {0 50, 1 90}}} {:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6} {:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:request-size 104857600}} {:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})})
+[//]: # ({:display :header, :valid-structure? true, :rendered-params ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6} {:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :catalog-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {:kafka/consumer-opts {}, :kafka/start-offsets {0 50, 1 90}}} {:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}} {:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6} {:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:kafka/producer-opts {}, :kafka/request-size 104857600}} {:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]} {:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})})
 [//]: # (✔ All catalog entries documented.)
 [//]: # (✔ All lifecycle entries documented.)
 ## onyx-kafka
@@ -76,7 +76,7 @@ In your peer boot-up namespace:
 [//]: # ({:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6})
 ###### Write messages to kafka.
 
-[//]: # ({:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:request-size 104857600}})
+[//]: # ({:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:kafka/producer-opts {}, :kafka/request-size 104857600}})
 ```clojure
 {:kafka/topic
  "The topic name to write to. Must either be supplied or otherwise all messages must contain a `:topic` key",
@@ -84,10 +84,9 @@ In your peer boot-up namespace:
  :kafka/partition
  "Partition to write to, if you do not wish messages to be auto allocated to partitions. Must either be supplied in the task map, or all messages should contain a `:partition` key.",
  :kafka/serializer-fn :my.ns/serializer-fn,
- :kafka/request-size :onyx.gen-doc/please-handle-in-merge-additions,
+ :kafka/request-size 104857600,
  :kafka/no-seal? false,
- :kafka/producer-opts :onyx.gen-doc/please-handle-in-merge-additions,
- :request-size 104857600}
+ :kafka/producer-opts {}}
 ```
 
 [//]: # ({:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]})
