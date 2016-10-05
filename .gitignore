@@ -11,3 +11,4 @@ data/
 onyx.log
 hs_err_pid*
 scripts/release-scripts
+localrecording.jfr
