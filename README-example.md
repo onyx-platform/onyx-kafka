@@ -28,7 +28,7 @@ In your peer boot-up namespace:
 [//]: # ({:display :summary, :model :onyx.plugin.kafka/read-messages, :format :h6})
 ###### An input task to read messages from a Kafka topic.
 
-##### Catalog
+**Catalog Attributes**
 
 [//]: # ({:display :attribute-table, :model :onyx.plugin.kafka/read-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]})
 
@@ -51,6 +51,8 @@ In your peer boot-up namespace:
 | `:kafka/chan-capacity`        | `:long`    | `1000`   | The buffer size of the Kafka reading channel.                                                                                                                                                                                                                                                                                                                                                             |
 
 
+**Example Catalog Entry**
+
 [//]: # ({:display :catalog-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {:kafka/consumer-opts {}, :kafka/start-offsets {0 50, 1 90}}})
 ```clojure
 {:kafka/topic "The topic name to read from.",
@@ -67,7 +69,7 @@ In your peer boot-up namespace:
  :kafka/consumer-opts {}}
 ```
 
-##### Lifecycles
+**Lifecycles**
 
 [//]: # ({:display :lifecycle-entry, :model :onyx.plugin.kafka/read-messages, :merge-additions {}})
 ```clojure
@@ -80,7 +82,7 @@ In your peer boot-up namespace:
 [//]: # ({:display :summary, :model :onyx.plugin.kafka/write-messages, :format :h6})
 ###### Write messages to kafka.
 
-##### Catalog
+**Catalog Attributes**
 
 [//]: # ({:display :attribute-table, :model :onyx.plugin.kafka/write-messages, :columns [[:key "Key"] [:type "Type"] [:default "Default" :code] [:doc "Description"]]})
 
@@ -95,6 +97,8 @@ In your peer boot-up namespace:
 | `:kafka/producer-opts` | `:map`     |         | A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`. Values in this map get maximum priority. |
 
 
+**Example Catalog Entry**
+
 [//]: # ({:display :catalog-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {:kafka/producer-opts {}, :kafka/request-size 104857600}})
 ```clojure
 {:kafka/topic
@@ -108,7 +112,7 @@ In your peer boot-up namespace:
  :kafka/producer-opts {}}
 ```
 
-##### Lifecycles
+**Lifecycles**
 
 [//]: # ({:display :lifecycle-entry, :model :onyx.plugin.kafka/write-messages, :merge-additions {}})
 ```clojure
