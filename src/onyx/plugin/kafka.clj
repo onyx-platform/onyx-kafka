@@ -58,46 +58,48 @@
 (defn checkpoint-name [group-id topic assigned-partition]
   (format "%s-%s-%s" group-id topic assigned-partition))
 
-(defn checkpoint-or-beginning [log-prefix log consumer topic kpartition group-id task-map]
-  (let [k (checkpoint-name group-id topic kpartition)]
-    (try
-      (let [offset (inc (:offset (read-commit log k)))]
-        (info log-prefix "Seeking to checkpointed offset at:" offset)
-        (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
-      (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-        (try
-         ;; Try again using 0.9.9.0/0.9.10.0 checkpoint method
-         ;; This allows users to transition to new checkpoint from old method
-         (let [offset (inc (:offset (extensions/read-chunk log :chunk k)))]
-           (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
-         (catch org.apache.zookeeper.KeeperException$NoNodeException nne
-           (if-let [start-offsets (:kafka/start-offsets task-map)]
-             (let [offset (get start-offsets kpartition)]
-               (when-not offset
-                 (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
-                                 {:missing-partition kpartition
-                                  :kafka/start-offsets start-offsets})))
-               (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
-             (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))))))))
+(defn get-resume-offset [log-prefix log consumer group-id topic kpartition task-map]
+  (if-not (:kafka/force-reset? task-map) 
+    (let [k (checkpoint-name group-id topic kpartition)]
+      (try
+       (inc (:offset (read-commit log k)))
+       (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+         (try
+          (when-let [offset (:offset (extensions/read-chunk log :chunk k))]
+            (throw (ex-info "Offset was found at the old checkpoint path.
+                             Please set :kafka/force-reset? or resume manually with :kafka/start-offsets"
+                            {:partition kpartition
+                             :offset offset})))
+          (catch org.apache.zookeeper.KeeperException$NoNodeException nne
+            (if-let [start-offsets (:kafka/start-offsets task-map)]
+              (let [offset (get start-offsets kpartition)]
+                (when-not offset
+                  (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
+                                  {:missing-partition kpartition
+                                   :kafka/start-offsets start-offsets})))
+                offset)))))))))
 
 (defn seek-offset! [log-prefix log consumer group-id topic kpartition task-map]
-  (if (and (:kafka/force-reset? task-map)
-           (not (:kafka/start-offset task-map)))
-    (let [policy (:kafka/offset-reset task-map)]
-      (cond (= policy :earliest)
-            (do
-             (info log-prefix "Seeking to beginning offset on topic" {:topic topic :partition kpartition})
-             (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
+  (let [resume-offset (get-resume-offset log-prefix log consumer group-id topic kpartition task-map)
+        policy (:kafka/offset-reset task-map)]
+    (cond resume-offset
+          (do
+           (info log-prefix "Seeking to checkpointed offset at:" resume-offset)
+           (seek-to-offset! consumer {:topic topic :partition kpartition} resume-offset))
+     
+          (= policy :earliest)
+          (do
+           (info log-prefix "Seeking to earliest offset on topic" {:topic topic :partition kpartition})
+           (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
 
-            (= policy :latest)
-            (do
-             (info log-prefix "Seeking to end offset on topic" {:topic topic :partition kpartition})
-             (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
+          (= policy :latest)
+          (do
+           (info log-prefix "Seeking to latest offset on topic" {:topic topic :partition kpartition})
+           (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
 
-            :else
-            (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
-                                                               :policy policy}))))
-    (checkpoint-or-beginning log-prefix log consumer topic kpartition group-id task-map)))
+          :else
+          (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
+                                                             :policy policy})))))
 
 (defn log-id [replica-val job-id peer-id task-id]
   (get-in replica-val [:task-slot-ids job-id task-id peer-id]))
