@@ -251,10 +251,11 @@
   (read-batch [_ event]
     (let [pending (count @pending-messages)
           max-segments (max (min (- max-pending pending) batch-size) 0)
+          consumer (or (:kafka/consumer event) (throw (Exception. "Kafka consumer not found in event map. Did you include the Kafka input lifecycles?")))
           _ (when (and (not (zero? max-segments)) 
                        (or (nil? @iter)
                            (not (.hasNext ^java.util.Iterator @iter))))
-              (reset! iter (.iterator ^ConsumerRecords (.poll ^Consumer (.consumer ^FranzConsumer (:kafka/consumer event)) batch-timeout))))
+              (reset! iter (.iterator ^ConsumerRecords (.poll ^Consumer (.consumer ^FranzConsumer consumer) batch-timeout))))
           batch (transient [])
           n-retries (take-values! batch retry-ch batch-size)
           _ (take-records! batch @iter segment-fn (- max-segments n-retries))

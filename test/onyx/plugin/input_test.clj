@@ -23,6 +23,7 @@
             [onyx.api])
   (:import [franzy.clients.producer.types ProducerRecord]))
 
+(def n-partitions 8)
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
         base-job (merge {:workflow [[:read-messages :identity]
@@ -44,8 +45,8 @@
                                     :kafka/offset-reset :earliest
                                     :kafka/force-reset? true
                                     :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
-                                    :onyx/min-peers 2
-                                    :onyx/max-peers 2}
+                                    :onyx/min-peers n-partitions 
+                                    :onyx/max-peers n-partitions}
                                    batch-settings)))
         (add-task (core-async/output :out batch-settings)))))
 
@@ -62,7 +63,7 @@
                                           :controlled.shutdown.enable false}))
 
         zk-utils (k-admin/make-zk-utils {:servers [zookeeper]} false)
-        _ (k-topics/create-topic! zk-utils topic 2)
+        _ (k-topics/create-topic! zk-utils topic n-partitions)
 
         producer-config {:bootstrap.servers ["127.0.0.1:9092"]}
         key-serializer (byte-array-serializer)
@@ -88,7 +89,7 @@
         {:keys [out read-messages]} (get-core-async-channels job)
         mock (atom {})]
     (try
-      (with-test-env [test-env [4 env-config peer-config]]
+      (with-test-env [test-env [(+ n-partitions 2) env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
         (reset! mock (mock-kafka test-topic zk-address))
         (onyx.api/submit-job peer-config job)
