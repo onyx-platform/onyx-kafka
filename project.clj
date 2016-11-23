@@ -19,8 +19,8 @@
                  [com.stuartsierra/component "0.2.3"]]
   ;:test-selectors {:default (fn [v] (not (or (:benchmark v) (:broker-reboot v))))
   ;                 :broker-reboot :broker-reboot
-  ;                :benchmark :benchmark
-  ;                :all (constantly true)}
+  ;                 :benchmark :benchmark
+  ;                 :all (constantly true)}
   :profiles {:dev {:dependencies [[cheshire "5.5.0"]
                                   [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
                                   [aero "0.2.0"]
