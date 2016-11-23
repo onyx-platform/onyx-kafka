@@ -10,6 +10,7 @@ dependencies:
     - lein voom build-deps
   pre:
     - sudo service docker start   
+    - sudo stop zookeeper
     - docker-compose up -d
 
 test:
