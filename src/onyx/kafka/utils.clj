@@ -27,7 +27,6 @@
 
 (defn- consumer-record->message
   [decompress-fn m]
-  (log/info {:task ::consumer-record->message :msg m})
   {:key (some-> m :key decompress-fn)
    :partition (:partition m)
    :topic (:topic m)
