@@ -5,6 +5,7 @@
             [franzy.serialization.deserializers :refer [byte-array-deserializer]]
             [onyx.plugin.kafka :refer [id->broker]]
             [taoensso.timbre :as log]
+            [aero.core :refer [read-config]]
             [clojure.core.async :as async]))
 
 (defmacro ^:private timeout
@@ -26,7 +27,6 @@
 
 (defn- consumer-record->message
   [decompress-fn m]
-  (log/info {:task ::consumer-record->message :msg m})
   {:key (some-> m :key decompress-fn)
    :partition (:partition m)
    :topic (:topic m)
