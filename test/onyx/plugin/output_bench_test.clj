@@ -58,7 +58,6 @@
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :bench})
-
         tenancy-id (java.util.UUID/randomUUID)
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         peer-group (onyx.api/start-peer-group peer-config)

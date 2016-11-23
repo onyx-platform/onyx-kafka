@@ -5,7 +5,6 @@
             [com.stuartsierra.component :as component]
             [franzy.admin.zookeeper.client :as k-admin]
             [franzy.admin.cluster :as k-cluster]
-            [aero.core :refer [read-config]]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
             [onyx.kafka.embedded-server :as ke]
@@ -56,8 +55,7 @@
 (deftest kafka-output-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         other-test-topic (str "onyx-test-other-" (java.util.UUID/randomUUID))
-        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
-                                                      {:profile :test})
+        {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
         {:keys [in]} (get-core-async-channels job)
@@ -70,7 +68,7 @@
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address []))
+        (reset! mock (test-utils/mock-kafka test-topic zk-address [] (:embedded-kafka? test-config)))
         (test-utils/create-topic zk-address other-test-topic)
         (pipe (spool test-data) in) ;; Pipe data from test-data to the in channel
         (->> (onyx.api/submit-job peer-config job)

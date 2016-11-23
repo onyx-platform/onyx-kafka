@@ -1,13 +1,21 @@
+machine:
+  services:
+    - docker
+  java:
+    version: oraclejdk8
+
 dependencies:
   override:
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
+  pre:
+    - sudo service docker start   
+    - sudo stop zookeeper
+    - docker-compose up -d
 
 test:
   override:
     - lein test:
-        timeout: 480
-    - lein test :broker-reboot:
         timeout: 480
     - cp localrecording.jfr $CIRCLE_ARTIFACTS
 
