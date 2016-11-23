@@ -3,6 +3,7 @@
             [com.stuartsierra.component :as component]
             [franzy.admin.topics :as k-topics]
             [franzy.admin.zookeeper.client :as k-admin]
+            [aero.core]
             [franzy.clients.producer
              [client :as producer]
              [protocols :refer [send-sync!]]]
@@ -11,6 +12,12 @@
             [schema.core :as s]
             [taoensso.timbre :as log])
   (:import franzy.clients.producer.types.ProducerRecord))
+
+(defn read-config []
+  (aero.core/read-config (clojure.java.io/resource "config.edn") 
+                         {:profile (if (System/getenv "CIRCLECI")
+                                     :ci
+                                     :test)}))
 
 ;; Set the log level, otherwise Kafka emits a huge amount
 ;; of messages.
@@ -34,13 +41,16 @@
 
 (defn mock-kafka
   "Starts a Kafka in-memory instance, preloading a topic with xs.
-  If xs is a channel, will load the topic with items off the channel."
+   If xs is a channel, will load the topic with items off the channel."
   ([topic zookeeper xs]
    (mock-kafka topic zookeeper xs (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))))
   ([topic zookeeper xs log-dir]
+   (mock-kafka topic zookeeper xs (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) true))
+  ([topic zookeeper xs log-dir embedded-kafka?]
    (let [kafka-server (component/start
                        (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
                                            :port 9092
+                                           :embedded-kafka? embedded-kafka?
                                            :broker.id 0
                                            :log.dir log-dir
                                            :zookeeper.connect zookeeper

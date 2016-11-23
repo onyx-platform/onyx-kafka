@@ -1,23 +1,32 @@
-{:env-config
+{:test-config
+ {:embedded-kafka? #cond {:default false
+                          :test false
+                          :ci false}}
+ :env-config
  {:onyx/tenancy-id #env [ONYX_ID "testcluster"]
   :zookeeper/address #cond {:default #env [ZOOKEEPER "zookeeper"]
-                            :test "127.0.0.1:2188"}
+                            :bench "127.0.0.1:2181"
+                            :ci "127.0.0.1:2181"
+                            :test "127.0.0.1:2181"}
   :zookeeper/server? #cond {:default false
-                            :test true}
-  :zookeeper.server/port 2188}
+                            :ci false
+                            :test false}
+  :zookeeper.server/port 2181}
  :peer-config
  {:onyx/tenancy-id                       #env [ONYX_ID "testcluster"]
   :zookeeper/address                     #cond {:default #env [ZOOKEEPER "zookeeper"]
                                                 :bench "127.0.0.1:2181"
-                                                :test "127.0.0.1:2188"}
+                                                :ci "127.0.0.1:2181"
+                                                :test #env [ZOOKEEPER "127.0.0.1:2181"]}
   :onyx.peer/job-scheduler               :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout           60000
   :onyx.messaging/allow-short-circuit?   #cond {:default true
                                                 :bench true
-                                                :test false}
+                                                :test true}
   :onyx.messaging/impl                   :aeron
   :onyx.messaging/bind-addr              #env [BIND_ADDR "localhost"]
   :onyx.messaging/peer-port              40200
-  :onyx.messaging.aeron/embedded-driver? #cond {:default false
+  :onyx.messaging.aeron/embedded-driver? #cond {:default true
                                                 :bench true
+                                                :ci true
                                                 :test true}}}

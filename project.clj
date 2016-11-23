@@ -17,10 +17,10 @@
                  [ymilky/franzy "0.0.1"]
                  [ymilky/franzy-admin "0.0.1" :exclusions [org.slf4j/slf4j-log4j12]]
                  [com.stuartsierra/component "0.2.3"]]
-  :test-selectors {:default (fn [v] (not (or (:benchmark v) (:broker-reboot v))))
-                   :broker-reboot :broker-reboot
-                   :benchmark :benchmark
-                   :all (constantly true)}
+  ;:test-selectors {:default (fn [v] (not (or (:benchmark v) (:broker-reboot v))))
+  ;                 :broker-reboot :broker-reboot
+  ;                :benchmark :benchmark
+  ;                :all (constantly true)}
   :profiles {:dev {:dependencies [[cheshire "5.5.0"]
                                   [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
                                   [aero "0.2.0"]

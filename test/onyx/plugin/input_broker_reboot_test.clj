@@ -6,6 +6,7 @@
             [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
+            [clojure.java.shell :refer [sh]]
             [onyx.plugin kafka
              [core-async :refer [take-segments! get-core-async-channels]]
              [test-utils :as test-utils]]
@@ -41,13 +42,27 @@
                                       batch-settings)))
         (add-task (core-async/output :out batch-settings)))))
 
+(defn stop-kafka [mock embedded-kafka?]
+  (if embedded-kafka?
+    (swap! mock component/stop)
+    (do
+     (println "Stopping Docker Kafka instance")
+     (sh "docker" "stop" "kafkadocker_kafka_1"))))
+
+(defn start-kafka [mock embedded-kafka?]
+  (if embedded-kafka?
+    (swap! mock component/start)
+    (do
+     (println "Starting Docker Kafka instance")
+     (sh "docker" "start" "kafkadocker_kafka_1"))))
+
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
 
 (deftest ^:broker-reboot kafka-broker-reboot-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
-        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
-                                                      {:profile :test})
+        {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
+        embedded-kafka? (:embedded-kafka? test-config)
         tenancy-id (str (java.util.UUID/randomUUID))
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
@@ -62,12 +77,12 @@
      (with-test-env [test-env [4 env-config peer-config]]
        (onyx.test-helper/validate-enough-peers! test-env job)
        (doseq [x test-data1] (>!! input-chan x))
-       (reset! mock (test-utils/mock-kafka test-topic zk-address input-chan (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))))
+       (reset! mock (test-utils/mock-kafka test-topic zk-address input-chan (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) embedded-kafka?))
        (onyx.api/submit-job peer-config job)
        (Thread/sleep 10000)
-       (swap! mock component/stop)
-       (Thread/sleep 30000)
-       (swap! mock component/start)
+       (stop-kafka mock embedded-kafka?)
+       (Thread/sleep 60000)
+       (start-kafka mock embedded-kafka?)
        (Thread/sleep 5000)
        (doseq [x test-data2] (>!! input-chan x))
        (is (= (set (into test-data1 test-data2))

@@ -57,9 +57,7 @@
 (deftest kafka-offset-reset-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
-
-        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
-                                                      {:profile :test})
+        {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         tenancy-id (str (java.util.UUID/randomUUID))
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
@@ -71,7 +69,7 @@
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data))
+        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) (:embedded-kafka? test-config)))
         (onyx.api/submit-job peer-config job)
         (is (= (into [{:n 1} {:n 2}] test-data)
                (onyx.plugin.core-async/take-segments! out))))
