@@ -15,8 +15,6 @@ test:
   override:
     - lein test:
         timeout: 480
-    - lein test :broker-reboot:
-        timeout: 480
     - cp localrecording.jfr $CIRCLE_ARTIFACTS
 
 machine:
