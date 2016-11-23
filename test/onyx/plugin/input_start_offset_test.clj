@@ -53,10 +53,11 @@
 (defn mock-kafka
   "Use a custom version of mock-kafka as opposed to the one in test-utils
   because we need to spawn 2 producers in order to write to each partition"
-  [topic zookeeper]
+  [topic zookeeper embedded-kafka?]
   (let [kafka-server (component/start
                       (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
                                           :port 9092
+                                          :server? embedded-kafka?
                                           :broker.id 1
                                           :log.dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
                                           :zookeeper.connect zookeeper
@@ -76,8 +77,7 @@
 (deftest kafka-input-start-offset-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
-        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
-                                                      {:profile :test})
+        {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         tenancy-id (str (java.util.UUID/randomUUID))
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
@@ -88,7 +88,7 @@
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (mock-kafka test-topic zk-address))
+        (reset! mock (mock-kafka test-topic zk-address (:embedded-kafka? test-config)))
         (onyx.api/submit-job peer-config job)
         (is (= [{:n 1} {:n 2} {:n 3} {:n 4}] (onyx.plugin.core-async/take-segments! out 10000))))
       (finally (swap! mock component/stop)))))

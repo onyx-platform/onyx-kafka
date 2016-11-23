@@ -41,8 +41,7 @@
 (deftest kafka-static-partition-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
-        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
-                                                      {:profile :test})
+        {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         zk-address (get-in peer-config [:zookeeper/address])
         tenancy-id (str (java.util.UUID/randomUUID))
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
@@ -54,7 +53,7 @@
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data))
+        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) (:embedded-kafka? test-config)))
         (->> (onyx.api/submit-job peer-config job)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))

@@ -43,7 +43,7 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition 2000000)
+(def messages-per-partition 200000)
 (def n-partitions 1)
 
 (defn print-message [segment]
@@ -65,10 +65,7 @@
                          :lifecycles []
                          :windows []
                          :triggers []
-                         :flow-conditions [#_{:flow/from :read-messages
-                                            :flow/to [:out]
-                                            :flow/short-circuit? true
-                                            :flow/predicate ::flow-on?}]
+                         :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
         (add-task (consumer :read-messages
@@ -88,7 +85,7 @@
         (add-task (core-async/output :out 
                                      {:onyx/batch-timeout batch-timeout
                                       :onyx/batch-size batch-size}
-                                     100000000 #_(inc (* n-partitions messages-per-partition)))))))
+                                     100000000)))))
 
 (defn mock-kafka
   "Use a custom version of mock-kafka as opposed to the one in test-utils
