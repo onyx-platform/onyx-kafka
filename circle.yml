@@ -11,7 +11,7 @@ dependencies:
   pre:
     - sudo service docker start   
     - sudo stop zookeeper
-    - docker-compose up -d
+    - docker-compose up
 
 test:
   override:
