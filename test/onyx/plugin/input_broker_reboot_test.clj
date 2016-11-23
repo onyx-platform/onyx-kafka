@@ -47,14 +47,14 @@
     (swap! mock component/stop)
     (do
      (println "Stopping Docker Kafka instance")
-     (sh "docker" "stop" "kafkadocker_kafka_1"))))
+     (sh "docker" "stop" "onyxkafka_kafka_1"))))
 
 (defn start-kafka [mock embedded-kafka?]
   (if embedded-kafka?
     (swap! mock component/start)
     (do
      (println "Starting Docker Kafka instance")
-     (sh "docker" "start" "kafkadocker_kafka_1"))))
+     (sh "docker" "start" "onyxkafka_kafka_1"))))
 
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
