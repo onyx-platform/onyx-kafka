@@ -9,7 +9,7 @@ dependencies:
     - echo '{:user {:plugins [[lein-voom "0.1.0-20150822_000839-g763d315"]]}}' > ~/.lein/profiles.clj
     - lein voom build-deps
   pre:
-    - service docker start   
+    - sudo service docker start   
     - ./scripts/start_kafka_docker.sh
 
 test:
