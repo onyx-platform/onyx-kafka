@@ -1,3 +1,6 @@
+#### 0.9.15.1
+* Major bug fix: peer recovery may lose messages that were read but were unacked
+
 #### 0.9.11.1
 * Major bug fix: `:kafka/offset-reset` was ignored unless `:kafka/force-reset?` was set.
 
