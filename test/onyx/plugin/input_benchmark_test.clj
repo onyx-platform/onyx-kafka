@@ -15,7 +15,7 @@
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
             [onyx.kafka.embedded-server :as ke]
-            [onyx.kafka.utils :refer [take-until-done]]
+            [onyx.kafka.utils]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
@@ -77,9 +77,8 @@
                              :kafka/receive-buffer-bytes 65536
                              :kafka/deserializer-fn ::decompress
                              :onyx/fn ::print-message
-                             :onyx/batch-timeout 500
+                             :onyx/batch-timeout 50
                              :onyx/batch-size batch-size
-                             :onyx/max-pending 10000
                              :onyx/min-peers n-partitions
                              :onyx/max-peers n-partitions}))
         (add-task (core-async/output :out 

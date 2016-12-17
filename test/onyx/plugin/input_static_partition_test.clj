@@ -53,10 +53,13 @@
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) (:embedded-kafka? test-config)))
+        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data
+                                            (str "/tmp/embedded-kafka"
+                                                 (java.util.UUID/randomUUID))
+                                            (:embedded-kafka? test-config)))
         (->> (onyx.api/submit-job peer-config job)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))
-        (is (= test-data
-               (onyx.plugin.core-async/take-segments! out))))
+        (is (= (butlast test-data)
+               (onyx.plugin.core-async/take-segments! out 50))))
       (finally (swap! mock component/stop)))))

@@ -14,7 +14,7 @@
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
             [onyx.kafka.embedded-server :as ke]
-            [onyx.kafka.utils :refer [take-until-done]]
+            [onyx.kafka.utils]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
@@ -100,7 +100,6 @@
         (onyx.api/submit-job peer-config job)
         (Thread/sleep 2000)
         (write-messages test-topic zk-address)
-
         (is (= 15
                (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000))))))
       (finally (swap! mock component/stop)))))

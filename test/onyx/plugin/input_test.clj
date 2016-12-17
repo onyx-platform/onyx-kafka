@@ -19,7 +19,7 @@
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
             [onyx.kafka.embedded-server :as ke]
-            [onyx.kafka.utils :refer [take-until-done]]
+            [onyx.kafka.utils]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
@@ -99,8 +99,10 @@
         (reset! mock (mock-kafka test-topic zk-address (:embedded-kafka? test-config)))
         (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
           (println "Taking segments")
-          (is (= 15
-                 (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000)))))
+          ;(onyx.test-helper/feedback-exception! peer-config job-id)
+          (let [results (onyx.plugin.core-async/take-segments! out 10000)] 
+            (println "RESULTS" results)
+            (is (= 15 (reduce + (mapv :n results)))))
           (println "Done taking segments")
           (onyx.api/kill-job peer-config job-id)))
       (finally (swap! mock component/stop)))))

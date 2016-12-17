@@ -28,7 +28,6 @@
    (s/optional-key :kafka/start-offsets) {s/Int s/Int}
    (s/optional-key :kafka/receive-buffer-bytes) s/Int
    (s/optional-key :kafka/partition) s/Str
-   (s/optional-key :kafka/commit-interval) s/Num
    (s/optional-key :kafka/wrap-with-metadata?) s/Bool
    (os/restricted-ns :kafka) s/Any})
 
@@ -39,7 +38,6 @@
                              :onyx/type :input
                              :onyx/medium :kafka
                              :kafka/receive-buffer-bytes 65536
-                             :kafka/commit-interval 2000
                              :kafka/wrap-with-metadata? false
                              :onyx/doc "Reads messages from a Kafka topic"}
                             opts)

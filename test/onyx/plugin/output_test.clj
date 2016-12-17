@@ -1,5 +1,5 @@
 (ns onyx.plugin.output-test
-  (:require [clojure.core.async :refer [<!! go pipe]]
+  (:require [clojure.core.async :refer [<!! go pipe close! >!!]]
             [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as component]
@@ -8,7 +8,7 @@
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
             [onyx.kafka.embedded-server :as ke]
-            [onyx.kafka.utils :refer [take-now take-until-done]]
+            [onyx.kafka.utils :refer [take-now]]
             [onyx.tasks.kafka :refer [producer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
@@ -56,6 +56,9 @@
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         other-test-topic (str "onyx-test-other-" (java.util.UUID/randomUUID))
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
+        tenancy-id (str (java.util.UUID/randomUUID)) 
+        env-config (assoc env-config :onyx/tenancy-id tenancy-id)
+        peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
         {:keys [in]} (get-core-async-channels job)
@@ -63,21 +66,21 @@
         test-data [{:key 1 :message {:n 0}}
                    {:message {:n 1}}
                    {:key "tarein" :message {:n 2}}
-                   {:message {:n 3} :topic other-test-topic}
-                   :done]]
+                   {:message {:n 3} :topic other-test-topic}]]
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
         (reset! mock (test-utils/mock-kafka test-topic zk-address [] (:embedded-kafka? test-config)))
         (test-utils/create-topic zk-address other-test-topic)
-        (pipe (spool test-data) in) ;; Pipe data from test-data to the in channel
+        (run! #(>!! in %) test-data)
+        (close! in)
         (->> (onyx.api/submit-job peer-config job)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))
         (testing "routing to default topic"
           (log/info "Waiting on messages in" test-topic)
           (let [msgs (prepare-messages
-                      (take-until-done zk-address test-topic decompress))]
+                      (take-now zk-address test-topic decompress))]
             (is (= [test-topic] (->> msgs (map :topic) distinct)))
             (is (= [{:key 1 :value {:n 0} :partition 0}
                     {:key nil :value {:n 1} :partition 0}

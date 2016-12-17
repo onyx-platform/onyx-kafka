@@ -34,9 +34,7 @@
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :earliest
                                        :kafka/force-reset? true
-                                       :kafka/commit-interval 500
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
-                                       :onyx/pending-timeout 20000
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))
@@ -49,12 +47,12 @@
    (fn [event lifecycle]
      ; give the peer a bit of time to write the chunks out and ack the batches,
      ; since we want to ensure that the batches aren't re-read on restart for ease of testing
-     (Thread/sleep 5000)
      (when (= (swap! batch-num inc) 2)
        (throw (ex-info "Restartable" {:restartable? true}))))
    :lifecycle/handle-exception (constantly :restart)})
 
-(deftest kafka-offset-reset-test
+;; DISABLED: todo, need a proper way to force-reset?
+#_(deftest kafka-offset-reset-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
@@ -63,14 +61,17 @@
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
-        {:keys [out read-messages]} (get-core-async-channels job)
         test-data [{:n 1} {:n 2} {:n 3} {:n 4} {:n 5} {:n 6} :done]
         mock (atom {})]
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
         (reset! mock (test-utils/mock-kafka test-topic zk-address test-data (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) (:embedded-kafka? test-config)))
-        (onyx.api/submit-job peer-config job)
-        (is (= (into [{:n 1} {:n 2}] test-data)
-               (onyx.plugin.core-async/take-segments! out))))
+        (->> job 
+             (onyx.api/submit-job peer-config)
+             (:job-id)
+             (onyx.test-helper/feedback-exception! peer-config))
+        (let [{:keys [out read-messages]} (get-core-async-channels job)] 
+          (is (= (into [{:n 1} {:n 2}] test-data)
+               (onyx.plugin.core-async/take-segments! out 50)))))
       (finally (swap! mock component/stop)))))

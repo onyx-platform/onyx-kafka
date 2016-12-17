@@ -13,17 +13,29 @@
              [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
-  (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
+  (let [batch-settings {:onyx/batch-size batch-size 
+                        :onyx/batch-timeout batch-timeout}
         base-job (merge {:workflow [[:read-messages :identity]
                                     [:identity :out]]
                          :catalog [(merge {:onyx/name :identity
                                            :onyx/fn :clojure.core/identity
+                                           ;; deduplicate? should be deprecated
+                                           :onyx/deduplicate? false
+                                           :onyx/n-peers 1
                                            :onyx/type :function}
                                           batch-settings)]
                          :lifecycles [{:lifecycle/task :read-messages
                                        :lifecycle/calls ::read-crash}]
-                         :windows []
-                         :triggers []
+                         :windows [{:window/id :collect-segments
+                                    :window/task :identity
+                                    :window/type :global
+                                    :window/aggregation :onyx.windowing.aggregation/conj}]
+                         :triggers [{:trigger/window-id :collect-segments
+                                     :trigger/refinement :onyx.refinements/accumulating
+                                     :trigger/fire-all-extents? true
+                                     :trigger/on :onyx.triggers/segment
+                                     :trigger/threshold [1 :elements]
+                                     :trigger/sync ::update-atom!}]
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
@@ -33,23 +45,23 @@
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :earliest
                                        :kafka/force-reset? false
-                                       :kafka/commit-interval 500
-                                       :onyx/pending-timeout 20000
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                        :onyx/max-peers 1
-                                       :onyx/batch-size 2}
+                                       :onyx/batch-size 1}
                                       batch-settings)))
-        (add-task (core-async/output :out batch-settings)))))
+        (add-task (core-async/output :out batch-settings 100000)))))
 
 (def batch-num (atom 0))
+
+(def test-state (atom []))
+
+(defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as state-event} extent-state]
+  (reset! test-state extent-state))
 
 (def read-crash
   {:lifecycle/before-batch
    (fn [event lifecycle]
-     ; give the peer a bit of time to write the chunks out and ack the batches,
-     ; since we want to ensure that the batches aren't re-read on restart for ease of testing
-     (Thread/sleep 5000)
-     (when (= (swap! batch-num inc) 2)
+     (when (= (swap! batch-num inc) 4)
        (throw (ex-info "Restartable" {:restartable? true}))))
    :lifecycle/handle-exception (constantly :restart)})
 
@@ -59,17 +71,24 @@
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         tenancy-id (str (java.util.UUID/randomUUID))
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
-        peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
+        peer-config (assoc peer-config 
+                           :onyx/tenancy-id tenancy-id 
+                           :onyx.peer/coordinator-barrier-period-ms 50)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
-        {:keys [out read-messages]} (get-core-async-channels job)
-        test-data [{:n 1} {:n 2} {:n 3} {:n 4} {:n 5} {:n 6} :done]
+        test-data (conj (mapv (fn [v] {:n v}) (range 5000)) :done)
         mock (atom {})]
     (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) (:embedded-kafka? test-config)))
-        (onyx.api/submit-job peer-config job)
-        (is (= test-data ;; After failure, we can pick up where we left off
-               (onyx.plugin.core-async/take-segments! out))))
+        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data
+                                            (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
+                                            (:embedded-kafka? test-config)))
+        (->> job 
+             (onyx.api/submit-job peer-config)
+             :job-id
+             (onyx.test-helper/feedback-exception! peer-config))
+        (Thread/sleep 1000)
+        (let [{:keys [out]} (get-core-async-channels job)] 
+          (is (= (butlast test-data) @test-state))))
       (finally (swap! mock component/stop)))))
