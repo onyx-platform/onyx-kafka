@@ -117,48 +117,51 @@
   [event lifecycle]
   {})
 
-(defn take-record! [^java.util.Iterator iterator]
-  (if (.hasNext iterator)
-    (.next iterator)))
-
-(defrecord KafkaReadMessages 
-  [log-prefix task-map topic kpartition batch-timeout deserializer-fn segment-fn consumer iter record offset drained?]
-
+(deftype KafkaReadMessages 
+  [log-prefix task-map topic ^:unsynchronized-mutable kpartition batch-timeout
+   deserializer-fn segment-fn ^:unsynchronized-mutable consumer 
+   ^:unsynchronized-mutable iter ^:unsynchronized-mutable record
+   ^:unsynchronized-mutable offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
     (let [{:keys [kafka/group-id kafka/consumer-opts]} task-map
-        brokers (find-brokers (:kafka/zookeeper task-map))
-        _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
-        consumer-config (merge {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
-                                :group.id group-id
-                                :enable.auto.commit false
-                                :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
-                                                          (:kafka/receive-buffer-bytes defaults))
-                                :auto.offset.reset (:kafka/offset-reset task-map)}
-                               consumer-opts)
-        key-deserializer (byte-array-deserializer)
-        value-deserializer (byte-array-deserializer)
-        consumer (consumer/make-consumer consumer-config key-deserializer value-deserializer)
-        kpartition (if-let [part (:partition task-map)]
-                     (Integer/parseInt part)
-                     (:slot-id event)) ;; FIXME, will be back to onyx.core/slot-id
-        partitions (mapv :partition (metadata/partitions-for consumer topic))
-        n-partitions (count partitions)
-        _ (check-num-peers-equals-partitions task-map n-partitions)
-        _ (assign-partitions! consumer [{:topic topic :partition kpartition}])]
-      (assoc this :consumer consumer :kpartition kpartition)))
+          brokers (find-brokers (:kafka/zookeeper task-map))
+          _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
+          consumer-config (merge {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
+                                  :group.id group-id
+                                  :enable.auto.commit false
+                                  :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
+                                                            (:kafka/receive-buffer-bytes defaults))
+                                  :auto.offset.reset (:kafka/offset-reset task-map)}
+                                 consumer-opts)
+          key-deserializer (byte-array-deserializer)
+          value-deserializer (byte-array-deserializer)
+          consumer* (consumer/make-consumer consumer-config key-deserializer value-deserializer)
+          kpartition* (if-let [part (:partition task-map)]
+                        (Integer/parseInt part)
+                        (:slot-id event)) ;; FIXME, will be back to onyx.core/slot-id
+          partitions (mapv :partition (metadata/partitions-for consumer* topic))
+          n-partitions (count partitions)]
+      (check-num-peers-equals-partitions task-map n-partitions)
+      (assign-partitions! consumer* [{:topic topic :partition kpartition*}])
+      (set! consumer consumer*)
+      (set! kpartition kpartition*)
+      this))
 
-  (stop [this event] this
-    (when consumer (.close consumer)))
+  (stop [this event] 
+    (when consumer 
+      (.close consumer)
+      (set! consumer nil))
+    this)
 
   i/Input
   (checkpoint [this]
     offset)
 
   (recover [this replica-version checkpoint]
-    (reset! drained? false)
+    (set! drained false)
     (seek-offset! log-prefix consumer kpartition task-map topic checkpoint)
-    (assoc this :offset nil))
+    this)
 
   (segment [this]
     (let [v (some-> record segment-fn)]
@@ -169,28 +172,28 @@
     this)
 
   (next-state [this state]
-    (let [_ (when (or (nil? @iter)
-                      (not (.hasNext ^java.util.Iterator @iter)))
-              (reset! iter (.iterator ^ConsumerRecords (.poll ^Consumer (.consumer ^FranzConsumer consumer) batch-timeout))))
-          rec (take-record! @iter)
-          new-offset (if rec
-                       (.offset rec)
-                       offset)]
-      ;; Doubling up on the deserialization for now
-      ;; will remove done soon
-      (if (= :done (some-> rec (.value) deserializer-fn))
-        (reset! drained? true))
-      (-> this
-          (assoc :record rec)
-          (assoc :offset new-offset))))
+    (if (and iter (.hasNext ^java.util.Iterator iter))
+      (let [rec (.next ^java.util.Iterator iter)
+            new-offset (if rec
+                         (.offset rec)
+                         offset)]
+        ;; Doubling up on the deserialization for now
+        ;; will remove done soon
+        (if (= :done (some-> rec (.value) deserializer-fn))
+          (set! drained true))
+        (set! record rec)
+        (set! offset new-offset)
+        this) 
+      (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer (.consumer ^FranzConsumer consumer) batch-timeout)))
+          (set! record nil)
+          this)))
 
   (completed? [this]
-    @drained?))
+    drained))
 
 (defn read-messages [{:keys [task-map log-prefix]}]
   (let [{:keys [kafka/topic kafka/deserializer-fn]} task-map ;; fixme onyx.core
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
-        drained? (atom false)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
         deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
         segment-fn (if wrap-message?
@@ -203,7 +206,7 @@
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
-                         deserializer-fn segment-fn nil (atom nil) nil nil drained?)))
+                         deserializer-fn segment-fn nil nil nil nil false)))
 
 (defn close-read-messages
   [{:keys [kafka/retry-ch kafka/commit-fut kafka/consumer] :as pipeline} lifecycle]
@@ -249,6 +252,8 @@
     this)
 
   o/Output
+  (synchronized? [this epoch]
+    true)
   (prepare-batch
     [_ state]
     state)

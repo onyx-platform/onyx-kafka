@@ -18,6 +18,14 @@ In your peer boot-up namespace:
 (:require [onyx.plugin.kafka])
 ```
 
+#### ABS TODO
+
+Currently the ABS version of this plugin does not support everything from the 0.9 plugin.
+
+The two main missing features are the ability to checkpoint offsets in a way
+that can be resumed between two jobs, and a way to reset the checkpointed
+offset.
+
 #### Functions
 
 ##### read-messages
