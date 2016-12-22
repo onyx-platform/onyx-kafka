@@ -23,9 +23,7 @@
             [onyx.plugin.protocols.input :as i]
             [onyx.plugin.protocols.output :as o]
             [onyx.static.uuid :refer [random-uuid]]
-            ;; FIXME
-            ;[onyx.static.util :refer [kw->fn]]
-            [onyx.peer.operation :refer [kw->fn]]
+            [onyx.static.util :refer [kw->fn]]
             [onyx.extensions :as extensions]
             [onyx.types :as t]
             [onyx.tasks.kafka]
@@ -139,7 +137,7 @@
           consumer* (consumer/make-consumer consumer-config key-deserializer value-deserializer)
           kpartition* (if-let [part (:partition task-map)]
                         (Integer/parseInt part)
-                        (:slot-id event)) ;; FIXME, will be back to onyx.core/slot-id
+                        (:onyx.core/slot-id event))
           partitions (mapv :partition (metadata/partitions-for consumer* topic))
           n-partitions (count partitions)]
       (check-num-peers-equals-partitions task-map n-partitions)
@@ -168,10 +166,10 @@
       (if-not (= v :done)
         v)))
 
-  (next-epoch [this epoch]
-    this)
+  (synced? [this epoch]
+    [true this])
 
-  (next-state [this state]
+  (next-state [this _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec (.next ^java.util.Iterator iter)
             new-offset (if rec
@@ -191,7 +189,7 @@
   (completed? [this]
     drained))
 
-(defn read-messages [{:keys [task-map log-prefix]}]
+(defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
   (let [{:keys [kafka/topic kafka/deserializer-fn]} task-map ;; fixme onyx.core
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
@@ -209,11 +207,11 @@
                          deserializer-fn segment-fn nil nil nil nil false)))
 
 (defn close-read-messages
-  [{:keys [kafka/retry-ch kafka/commit-fut kafka/consumer] :as pipeline} lifecycle]
+  [event lifecycle]
   {})
 
 (defn inject-write-messages
-  [{:keys [onyx.core/pipeline] :as pipeline} lifecycle]
+  [event lifecycle]
   {})
 
 (defn close-write-resources
@@ -252,28 +250,26 @@
     this)
 
   o/Output
-  (synchronized? [this epoch]
-    true)
+  (synced? [this epoch]
+    [true this])
+
   (prepare-batch
-    [_ state]
-    state)
+    [this event replica]
+    [true this])
 
-  (write-batch
-    [_ state]
-    (let [{:keys [results]} (get-event state)]
-      ;; todo, write version that doesn't block?
-      (let [messages (mapcat :leaves (:tree results))]
-        ;(println "Writing messages" messages)
-        (->> messages
-             (map (fn [msg]
-                    (->> (:message msg)
-                         (message->producer-record serializer-fn topic)
-                         (send-async! producer))))
-             (doall)
-             (run! deref))
-        (advance state)))))
+  (write-batch [this {:keys [onyx.core/results]} replica _]
+    (let [messages (mapcat :leaves (:tree results))]
+      (->> messages
+           (map (fn [msg]
+                  (->> (:message msg)
+                       (message->producer-record serializer-fn topic)
+                       (send-async! producer))))
+           (doall)
+           ;; could perform the deref in synchonized? to block less often
+           (run! deref))
+      [true this])))
 
-(defn write-messages [{:keys [task-map] :as event}]
+(defn write-messages [{:keys [onyx.core/task-map] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         request-size (or (get task-map :kafka/request-size) (get defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)

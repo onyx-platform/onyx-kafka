@@ -50,6 +50,7 @@
                             (merge {:kafka/topic topic
                                     :kafka/zookeeper zk-address
                                     :kafka/serializer-fn ::compress
+                                    :onyx/batch-size 500
                                     :onyx/fn ::wrap-message
                                     :kafka/request-size 307200}
                                    batch-settings))))))
