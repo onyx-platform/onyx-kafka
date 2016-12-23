@@ -62,7 +62,7 @@
   (if-not (:kafka/force-reset? task-map) 
     (let [k (checkpoint-name group-id topic kpartition)]
       (try
-       (inc (:offset (read-commit log k)))
+       (:offset (read-commit log k))
        (catch org.apache.zookeeper.KeeperException$NoNodeException nne
          (try
           (when-let [offset (:offset (extensions/read-chunk log :chunk k))]
@@ -127,25 +127,21 @@
                       {:recoverable? true
                        :zk-addr zk-addr})))))
 
-(defn highest-offset-to-commit [offsets]
-  (->> (sort offsets)
-       (partition-all 2 1)
-       (partition-by #(- (or (second %) (first %)) (first %)))
-       (first)
-       (last)
-       (last)))
+(defn highest-offset-to-commit [pending-commits max-offset-seen]
+  (if (empty? pending-commits)
+    (inc max-offset-seen)
+    (apply min pending-commits)))
 
-(defn commit-loop [log group-id topic kpartition commit-interval pending-commits]
+(defn commit-loop [log group-id topic kpartition commit-interval pending-commits max-offset-seen]
   (try
     (loop []
       (Thread/sleep commit-interval)
-      (when-let [offset (highest-offset-to-commit @pending-commits)]
+      (when-let [offset (highest-offset-to-commit @pending-commits @max-offset-seen)]
         (let [k (checkpoint-name group-id topic kpartition)
               data {:offset offset}]
-          (commit! log data k)
-          (swap! pending-commits (fn [coll] (remove (fn [k] (<= k offset)) coll)))))
-      (when-not (Thread/interrupted) 
-        (recur)))
+          (commit! log data k))
+        (when-not (Thread/interrupted) 
+          (recur))))
     (catch InterruptedException e
       (throw e))
     (catch Throwable e
@@ -205,7 +201,10 @@
         _ (seek-offset! (:log-prefix compiled) log consumer group-id topic kpartition task-map)
         offset (cp/next-offset consumer {:topic topic :partition kpartition})
         commit-interval (or (:kafka/commit-interval task-map) (:kafka/commit-interval defaults))
-        commit-fut (future (commit-loop log group-id topic kpartition commit-interval pending-commits))]
+        max-offset-seen (:max-offset-seen pipeline)
+        _ (reset! max-offset-seen offset)
+        commit-fut (future (commit-loop log group-id topic kpartition 
+                                        commit-interval pending-commits max-offset-seen))]
     {:kafka/commit-fut commit-fut
      :kafka/retry-ch retry-ch
      :kafka/consumer consumer
@@ -233,6 +232,15 @@
            (transient pending-messages) 
            batch)))
 
+(defn add-pending-commits [pending-commits batch]
+  (persistent! 
+   (reduce (fn [p m]
+             (if-let [offset (:offset m)] 
+               (conj! p offset)
+               p))
+           (transient pending-commits) 
+           batch)))
+
 (defn take-records! [batch ^java.util.Iterator iterator segment-fn n-messages]
   (loop [n n-messages]
     (if (and (.hasNext iterator)
@@ -241,8 +249,15 @@
        (conj! batch (segment-fn (.next iterator)))
        (recur (dec n))))))
 
+(defn complete? [batch pending-messages ^ManyToManyChannel retry-ch]
+  (and (all-done? batch)
+       (all-done? (vals @pending-messages))
+       (zero? (count (.buf retry-ch)))
+       (or (not (empty? @pending-messages))
+           (not (empty? batch)))))
+
 (defrecord KafkaReadMessages
-  [task-map max-pending batch-size batch-timeout pending-messages pending-commits drained? iter retry-ch segment-fn]
+  [task-map max-pending batch-size batch-timeout pending-messages pending-commits max-offset-seen drained? iter retry-ch segment-fn]
   p-ext/Pipeline
   (write-batch
     [this event]
@@ -260,12 +275,11 @@
           n-retries (take-values! batch retry-ch batch-size)
           _ (take-records! batch @iter segment-fn (- max-segments n-retries))
           batch (persistent! batch)]
+      (swap! pending-commits add-pending-commits batch)
       (swap! pending-messages add-pending-batch batch)
-      (when (and (all-done? batch)
-                 (all-done? (vals @pending-messages))
-                 (zero? (count (.buf ^ManyToManyChannel retry-ch)))
-                 (or (not (empty? @pending-messages))
-                     (not (empty? batch))))
+      (when-let [offsets (seq (keep :offset batch))]
+        (swap! max-offset-seen max (apply max offsets)))
+      (when (complete? batch pending-messages retry-ch)
         (if (:kafka/done-unsupported? event)
           (throw (ex-info ":done is not supported for auto assigned kafka partitions. (:kafka/partition must be supplied)"
                           {:recoverable? false
@@ -276,8 +290,7 @@
   p-ext/PipelineInput
 
   (ack-segment [_ _ segment-id]
-    (when-let [offset (:offset (get @pending-messages segment-id))]
-      (swap! pending-commits conj offset))
+    (swap! pending-commits disj (:offset (get @pending-messages segment-id)))
     (swap! pending-messages dissoc segment-id))
 
   (retry-segment
@@ -301,7 +314,7 @@
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         retry-ch (chan (* 2 max-pending))
         pending-messages (atom {})
-        pending-commits (atom (sorted-set))
+        pending-commits (atom #{})
         drained? (atom false)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
         deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
@@ -318,9 +331,10 @@
                        (assoc (t/input (random-uuid) 
                                        (deserializer-fn (.value cr)))
                               :offset (.offset cr))))
-        buffered-segments (atom nil)]
+        buffered-segments (atom nil)
+        max-offset-seen (atom -1)]
     (->KafkaReadMessages task-map max-pending batch-size batch-timeout
-                         pending-messages pending-commits drained? buffered-segments retry-ch segment-fn)))
+                         pending-messages pending-commits max-offset-seen drained? buffered-segments retry-ch segment-fn)))
 
 (defn close-read-messages
   [{:keys [kafka/retry-ch kafka/commit-fut kafka/consumer] :as pipeline} lifecycle]
