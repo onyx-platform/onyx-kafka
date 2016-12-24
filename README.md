@@ -172,9 +172,9 @@ This can be used like so:
                         :broker.id 0
                         :zookeeper.connect "127.0.0.1:2188"
                         :controlled.shutdown.enable false
-			:num-partitions 1
-			; optional log dir name - randomized dir will be created if none is supplied
-			; :log-dir "/tmp/embedded-kafka"})))
+                        :num-partitions 1
+                        ; optional log dir name - randomized dir will be created if none is supplied
+                        ; :log-dir "/tmp/embedded-kafka"})))
 
 ;; insert code to run a test here
 
