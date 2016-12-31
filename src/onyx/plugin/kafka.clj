@@ -39,7 +39,8 @@
 (def defaults
   {:kafka/receive-buffer-bytes 65536
    :kafka/commit-interval 2000
-   :kafka/wrap-with-metadata? false})
+   :kafka/wrap-with-metadata? false
+   :kafka/unable-to-find-broker-backoff-ms 8000})
 
 (defn seek-offset! [log-prefix consumer kpartition task-map topic checkpoint]
   (let [policy (:kafka/offset-reset task-map)
@@ -86,12 +87,17 @@
      (k-cluster/all-brokers zk-utils))))
 
 (defn find-brokers [zk-addr]
-  (let [results (vals (id->broker zk-addr))]
+  (let [zk-addr (:kafka/zookeeper task-map)
+        results (vals (id->broker zk-addr))]
     (if (seq results)
       results
-      (throw (ex-info "Could not locate any Kafka brokers to connect to."
-                      {:recoverable? true
-                       :zk-addr zk-addr})))))
+      (do
+       (info "Could not locate any Kafka brokers to connect to. Backing off.")
+       (Thread/sleep (or (:kafka/unable-to-find-broker-backoff-ms task-map) 
+                         (:kafka/unable-to-find-broker-backoff-ms defaults)))
+       (throw (ex-info "Could not locate any Kafka brokers to connect to."
+                       {:recoverable? true
+                        :zk-addr zk-addr}))))))
 
 (defn check-num-peers-equals-partitions 
   [{:keys [onyx/min-peers onyx/max-peers onyx/n-peers kafka/partition] :as task-map} n-partitions]
@@ -123,7 +129,9 @@
   p/Plugin
   (start [this event]
     (let [{:keys [kafka/group-id kafka/consumer-opts]} task-map
-          brokers (find-brokers (:kafka/zookeeper task-map))
+          brokers (find-brokers task-map)
+
+
           _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
           consumer-config (merge {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
                                   :group.id group-id
@@ -171,7 +179,7 @@
 
   (next-state [this _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
-      (let [rec (.next ^java.util.Iterator iter)
+      (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             new-offset (if rec
                          (.offset rec)
                          offset)]
@@ -258,12 +266,13 @@
     [true this])
 
   (write-batch [this {:keys [onyx.core/results]} replica _]
-    (let [messages (mapcat :leaves (:tree results))]
-      (->> messages
-           (map (fn [msg]
-                  (->> (:message msg)
-                       (message->producer-record serializer-fn topic)
-                       (send-async! producer))))
+    (let [xf (comp (mapcat :leaves)
+                   (map (fn [msg]
+                          (->> (:message msg)
+                               (message->producer-record serializer-fn topic)
+                               (send-async! producer)))))]
+      (->> (:tree results)
+           (sequence xf)
            (doall)
            ;; could perform the deref in synchonized? to block less often
            (run! deref))
