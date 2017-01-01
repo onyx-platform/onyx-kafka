@@ -64,22 +64,6 @@
         (doseq [x (range 3)] ;3 4 5
           (send-sync! producer2 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n (+ 3 x)})))))))))
 
-(defn mock-kafka
-  "Use a custom version of mock-kafka as opposed to the one in test-utils
-  because we need to spawn 2 producers in order to write to each partition"
-  [topic zookeeper]
-  (let [kafka-server (component/start
-                      (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
-                                          :port 9092
-                                          :broker.id 1
-                                          :log.dir (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
-                                          :zookeeper.connect zookeeper
-                                          :controlled.shutdown.enable false}))
-
-        zk-utils (k-admin/make-zk-utils {:servers [zookeeper]} false)]
-    (k-topics/create-topic! zk-utils topic 2)
-    kafka-server))
-
 (deftest kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
@@ -90,16 +74,12 @@
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
-        {:keys [out read-messages]} (get-core-async-channels job)
-        mock (atom {})]
-    (try
-      (with-test-env [test-env [4 env-config peer-config]]
-        (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (mock-kafka test-topic zk-address))
-        (write-messages test-topic zk-address)
-        (onyx.api/submit-job peer-config job)
-        (Thread/sleep 2000)
-        (write-messages test-topic zk-address)
-        (is (= 15
-               (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000))))))
-      (finally (swap! mock component/stop)))))
+        {:keys [out read-messages]} (get-core-async-channels job)]
+    (with-test-env [test-env [4 env-config peer-config]]
+      (onyx.test-helper/validate-enough-peers! test-env job)
+      (test-utils/create-topic zk-address test-topic 2)
+      (write-messages test-topic zk-address)
+      (onyx.api/submit-job peer-config job)
+      (Thread/sleep 2000)
+      (write-messages test-topic zk-address)
+      (is (= 15 (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000))))))))

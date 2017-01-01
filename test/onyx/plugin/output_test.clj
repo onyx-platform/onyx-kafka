@@ -62,15 +62,12 @@
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
         {:keys [in]} (get-core-async-channels job)
-        mock (atom {})
         test-data [{:key 1 :message {:n 0}}
                    {:message {:n 1}}
                    {:key "tarein" :message {:n 2}}
                    {:message {:n 3} :topic other-test-topic}]]
-    (try
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address [] (:embedded-kafka? test-config)))
         (test-utils/create-topic zk-address other-test-topic)
         (run! #(>!! in %) test-data)
         (close! in)
@@ -90,7 +87,4 @@
           (log/info "Waiting on messages in" other-test-topic)
           (is (= [{:key nil :value {:n 3} :partition 0 :topic other-test-topic}]
                  (prepare-messages
-                  (take-now zk-address other-test-topic decompress))))))
-      (finally
-        (log/info "Stopping mock Kafka...")
-        (swap! mock component/stop)))))
+                  (take-now zk-address other-test-topic decompress))))))))

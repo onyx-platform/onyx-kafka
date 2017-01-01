@@ -73,22 +73,18 @@
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
         peer-config (assoc peer-config 
                            :onyx/tenancy-id tenancy-id 
-                           :onyx.peer/coordinator-barrier-period-ms 50)
+                           ;; should be much lower to get some checkpointing in
+                           :onyx.peer/coordinator-barrier-period-ms 500)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
-        test-data (conj (mapv (fn [v] {:n v}) (range 5000)) :done)
-        mock (atom {})]
-    (try
+        test-data (conj (mapv (fn [v] {:n v}) (range 5000)) :done)]
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data
-                                            (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))
-                                            (:embedded-kafka? test-config)))
+        (test-utils/write-data test-topic zk-address test-data)
         (->> job 
              (onyx.api/submit-job peer-config)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))
         (Thread/sleep 1000)
         (let [{:keys [out]} (get-core-async-channels job)] 
-          (is (= (butlast test-data) @test-state))))
-      (finally (swap! mock component/stop)))))
+          (is (= (set (butlast test-data)) (set @test-state)))))))

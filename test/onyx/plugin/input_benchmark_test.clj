@@ -86,9 +86,7 @@
                                       :onyx/batch-size batch-size}
                                      100000000)))))
 
-(defn mock-kafka
-  "Use a custom version of mock-kafka as opposed to the one in test-utils
-  because we need to spawn 2 producers in order to write to each partition"
+(defn write-data
   [topic zookeeper]
   (let [zk-utils (k-admin/make-zk-utils {:servers [zookeeper]} false)
         _ (k-topics/create-topic! zk-utils topic n-partitions)
@@ -131,7 +129,7 @@
         {:keys [out read-messages]} (get-core-async-channels job)]
     (try
      (println "Topic is " test-topic)
-     (mock-kafka test-topic zk-address)
+     (write-data test-topic zk-address)
      (Thread/sleep 10000)
      (let [job-ret (onyx.api/submit-job peer-config job)
            _ (println "Job ret" job-ret)

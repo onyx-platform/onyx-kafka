@@ -22,7 +22,6 @@
    :kafka/group-id s/Str
    :kafka/zookeeper s/Str
    :kafka/offset-reset (s/enum :earliest :latest)
-   :kafka/force-reset? s/Bool
    :kafka/deserializer-fn os/NamespacedKeyword
    (s/optional-key :kafka/consumer-opts) {s/Any s/Any}
    (s/optional-key :kafka/start-offsets) {s/Int s/Int}
@@ -49,14 +48,12 @@
     group-id :- s/Str
     zookeeper :- s/Str
     offset-reset :- (s/enum :smallest :largest)
-    force-reset? :- s/Bool
     deserializer-fn :- os/NamespacedKeyword
     task-opts :- {s/Any s/Any}]
    (consumer task-name (merge {:kafka/topic topic
                                :kafka/group-id group-id
                                :kafka/zookeeper zookeeper
                                :kafka/offset-reset offset-reset
-                               :kafka/force-reset? force-reset?
                                :kafka/deserializer-fn deserializer-fn}
                               task-opts))))
 

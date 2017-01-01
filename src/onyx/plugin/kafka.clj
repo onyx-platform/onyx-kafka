@@ -86,7 +86,7 @@
      {}
      (k-cluster/all-brokers zk-utils))))
 
-(defn find-brokers [zk-addr]
+(defn find-brokers [task-map]
   (let [zk-addr (:kafka/zookeeper task-map)
         results (vals (id->broker zk-addr))]
     (if (seq results)
@@ -130,10 +130,8 @@
   (start [this event]
     (let [{:keys [kafka/group-id kafka/consumer-opts]} task-map
           brokers (find-brokers task-map)
-
-
           _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
-          consumer-config (merge {:bootstrap.servers (find-brokers (:kafka/zookeeper task-map))
+          consumer-config (merge {:bootstrap.servers brokers
                                   :group.id group-id
                                   :enable.auto.commit false
                                   :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)

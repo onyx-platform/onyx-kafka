@@ -34,9 +34,7 @@
                                        :kafka/group-id "onyx-consumer"
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :earliest
-                                       :kafka/force-reset? false
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
-                                       :onyx/pending-timeout 20000
                                        :onyx/max-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))
@@ -59,7 +57,7 @@
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
 
-#_(deftest ^:broker-reboot kafka-broker-reboot-test
+(deftest ^:broker-reboot kafka-broker-reboot-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         embedded-kafka? (:embedded-kafka? test-config)
@@ -72,19 +70,20 @@
         test-data1 [{:n 1}]
         test-data2 [{:n 2} {:n 3} {:n 4} {:n 5} {:n 6} :done]
         input-chan (chan 10)
-        mock (atom {})]
-    (try
-     (with-test-env [test-env [4 env-config peer-config]]
-       (onyx.test-helper/validate-enough-peers! test-env job)
-       (doseq [x test-data1] (>!! input-chan x))
-       (reset! mock (test-utils/mock-kafka test-topic zk-address input-chan (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) embedded-kafka?))
-       (onyx.api/submit-job peer-config job)
-       (Thread/sleep 10000)
-       (stop-kafka mock embedded-kafka?)
-       (Thread/sleep 60000)
-       (start-kafka mock embedded-kafka?)
-       (Thread/sleep 5000)
-       (doseq [x test-data2] (>!! input-chan x))
-       (is (= (set (into test-data1 test-data2))
-              (set (onyx.plugin.core-async/take-segments! out 10000)))))
-     (finally (swap! mock component/stop)))))
+        mock (atom {})
+        _ (test-utils/create-topic zk-address test-topic)]
+    (with-test-env [test-env [4 env-config peer-config]]
+      (onyx.test-helper/validate-enough-peers! test-env job)
+      (doseq [x test-data1] (>!! input-chan x))
+      (test-utils/write-data test-topic zk-address input-chan)
+      (onyx.api/submit-job peer-config job)
+      (Thread/sleep 10000)
+      (stop-kafka mock embedded-kafka?)
+      (Thread/sleep 20000)
+      (start-kafka mock embedded-kafka?)
+      ;; wait for long enough before putting onto the input channel
+      ;; otherwise it'll try to write to kafka before it's back up
+      (Thread/sleep 40000)
+      (doseq [x test-data2] (>!! input-chan x))
+      (is (= (disj (set (into test-data1 test-data2)) :done)
+             (set (onyx.plugin.core-async/take-segments! out 20000)))))))
