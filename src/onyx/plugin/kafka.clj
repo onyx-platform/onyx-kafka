@@ -175,6 +175,9 @@
   (synced? [this epoch]
     [true this])
 
+  (checkpointed! [this epoch]
+    [true this])
+
   (next-state [this _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)

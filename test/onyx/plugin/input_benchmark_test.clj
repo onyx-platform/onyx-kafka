@@ -43,7 +43,7 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition 200000)
+(def messages-per-partition 1000000)
 (def n-partitions 1)
 
 (defn print-message [segment]
@@ -73,7 +73,6 @@
                              :kafka/group-id "onyx-consumer-1"
                              :kafka/zookeeper zk-address
                              :kafka/offset-reset :earliest
-                             :kafka/force-reset? true
                              :kafka/receive-buffer-bytes 65536
                              :kafka/deserializer-fn ::decompress
                              :onyx/fn ::print-message

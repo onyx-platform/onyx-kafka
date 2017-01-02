@@ -44,7 +44,6 @@
                                        :kafka/group-id "onyx-consumer"
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :earliest
-                                       :kafka/force-reset? false
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                        :onyx/max-peers 1
                                        :onyx/batch-size 1}

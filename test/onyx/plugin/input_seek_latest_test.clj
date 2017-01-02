@@ -42,8 +42,6 @@
                                     :kafka/group-id "onyx-consumer"
                                     :kafka/zookeeper zk-address
                                     :kafka/offset-reset :latest
-                                    ;; Shouldn't matter whether true or false
-                                    :kafka/force-reset? (first (shuffle [true false]))
                                     :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                     :onyx/min-peers 2
                                     :onyx/max-peers 2}
