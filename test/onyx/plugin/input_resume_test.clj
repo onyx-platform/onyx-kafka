@@ -19,8 +19,6 @@
                                     [:identity :out]]
                          :catalog [(merge {:onyx/name :identity
                                            :onyx/fn :clojure.core/identity
-                                           ;; deduplicate? should be deprecated
-                                           :onyx/deduplicate? false
                                            :onyx/n-peers 1
                                            :onyx/type :function}
                                           batch-settings)]

@@ -124,8 +124,7 @@
 (deftype KafkaReadMessages 
   [log-prefix task-map topic ^:unsynchronized-mutable kpartition batch-timeout
    deserializer-fn segment-fn ^:unsynchronized-mutable consumer 
-   ^:unsynchronized-mutable iter ^:unsynchronized-mutable record
-   ^:unsynchronized-mutable offset ^:unsynchronized-mutable drained]
+   ^:unsynchronized-mutable iter ^:unsynchronized-mutable offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
     (let [{:keys [kafka/group-id kafka/consumer-opts]} task-map
@@ -162,38 +161,33 @@
   (checkpoint [this]
     offset)
 
-  (recover [this replica-version checkpoint]
+  (recover! [this replica-version checkpoint]
     (set! drained false)
     (seek-offset! log-prefix consumer kpartition task-map topic checkpoint)
     this)
 
-  (segment [this]
-    (let [v (some-> record segment-fn)]
-      (if-not (= v :done)
-        v)))
-
   (synced? [this epoch]
-    [true this])
+    true)
 
-  (checkpointed! [this epoch]
-    [true this])
+  (checkpointed! [this epoch])
 
-  (next-state [this _]
+  (poll! [this _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             new-offset (if rec
                          (.offset rec)
-                         offset)]
+                         offset)
+            deserialized (some-> rec (.value) deserializer-fn)]
         ;; Doubling up on the deserialization for now
         ;; will remove done soon
-        (if (= :done (some-> rec (.value) deserializer-fn))
-          (set! drained true))
-        (set! record rec)
-        (set! offset new-offset)
-        this) 
+        (if (= :done deserialized)
+          (do (set! drained true)
+              nil)
+          (do
+           (set! offset new-offset) 
+           deserialized))) 
       (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer (.consumer ^FranzConsumer consumer) batch-timeout)))
-          (set! record nil)
-          this)))
+          nil)))
 
   (completed? [this]
     drained))
@@ -213,7 +207,7 @@
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
-                         deserializer-fn segment-fn nil nil nil nil false)))
+                         deserializer-fn segment-fn nil nil nil false)))
 
 (defn close-read-messages
   [event lifecycle]
@@ -260,16 +254,18 @@
 
   o/Output
   (synced? [this epoch]
-    [true this])
+    true)
 
   (prepare-batch
     [this event replica]
-    [true this])
+    true)
+
+  (checkpointed! [this epoch])
 
   (write-batch [this {:keys [onyx.core/results]} replica _]
     (let [xf (comp (mapcat :leaves)
                    (map (fn [msg]
-                          (->> (:message msg)
+                          (->> msg
                                (message->producer-record serializer-fn topic)
                                (send-async! producer)))))]
       (->> (:tree results)
@@ -277,7 +273,7 @@
            (doall)
            ;; could perform the deref in synchonized? to block less often
            (run! deref))
-      [true this])))
+      true)))
 
 (defn write-messages [{:keys [onyx.core/task-map] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)

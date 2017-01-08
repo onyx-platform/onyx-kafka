@@ -53,7 +53,6 @@
        (go-loop [itm (<! xs)]
                 (if itm
                   (do
-                   (println "WRITING ITM" itm)
                    (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str itm))))
                    (recur (<! xs)))
                   (.close prod)))))))
