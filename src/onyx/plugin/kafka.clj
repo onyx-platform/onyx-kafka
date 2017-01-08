@@ -178,15 +178,16 @@
                          (.offset rec)
                          offset)
             deserialized (some-> rec (.value) deserializer-fn)]
-        ;; Doubling up on the deserialization for now
-        ;; will remove done soon
         (if (= :done deserialized)
           (do (set! drained true)
               nil)
           (do
            (set! offset new-offset) 
            deserialized))) 
-      (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer (.consumer ^FranzConsumer consumer) batch-timeout)))
+      (do (set! iter (.iterator ^ConsumerRecords 
+                                (.poll ^Consumer 
+                                       (.consumer ^FranzConsumer consumer) 
+                                       batch-timeout)))
           nil)))
 
   (completed? [this]
