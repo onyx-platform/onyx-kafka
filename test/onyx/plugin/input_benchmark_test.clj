@@ -129,17 +129,20 @@
     (try
      (println "Topic is " test-topic)
      (write-data test-topic zk-address)
-     (Thread/sleep 10000)
+     ;; Appropriate time to settle before submitting the job
+     (Thread/sleep 5000)
      (let [job-ret (onyx.api/submit-job peer-config job)
            _ (println "Job ret" job-ret)
            job-id (:job-id job-ret)
            start-time (System/currentTimeMillis)
-           read-nothing-timeout 10000
+           read-nothing-timeout 30000
            read-segments (take-until-nothing! out read-nothing-timeout)]
        (is (= (* n-partitions messages-per-partition) (count read-segments))) 
        (let [run-time (- (System/currentTimeMillis) start-time read-nothing-timeout)
              n-messages-total (* n-partitions messages-per-partition)]
-         (println (float (* 1000 (/ n-messages-total run-time))) "messages per second. Processed" n-messages-total "messages in" run-time "ms."))
+         (println (float (* 1000 (/ n-messages-total run-time))) 
+                  "messages per second. Processed" n-messages-total 
+                  "messages in" run-time "ms."))
        (onyx.api/kill-job peer-config job-id))
      (finally 
       (doseq [p v-peers]
