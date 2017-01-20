@@ -18,7 +18,6 @@
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.protocol.task-state :refer :all]
             [onyx.plugin.protocols.plugin :as p]
             [onyx.plugin.protocols.input :as i]
             [onyx.plugin.protocols.output :as o]
