@@ -256,8 +256,10 @@
   (synced? [this epoch]
     true)
 
-  (prepare-batch
-    [this event replica]
+  (recover! [this _ _] 
+    this)
+
+  (prepare-batch [this event replica]
     true)
 
   (checkpointed! [this epoch])
