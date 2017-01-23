@@ -144,7 +144,7 @@ topic, this will hang forever as there is no timeout.
 
 ;; retrieve the segments on the topic
 (def results
-  (kpu/take-segments (:zookeeper/addr peer-config) "yourtopic" your-decompress-fn))
+  (kpu/take-segments (:zookeeper/address peer-config) "yourtopic" your-decompress-fn))
 
 (last results)
 ; :done
@@ -166,13 +166,15 @@ This can be used like so:
 
 (def kafka-server
   (component/start
-    (ke/map->EmbeddedKafka {:hostname "127.0.0.1"
-                            :port 9092
-                            :broker-id 0
-			    :num-partitions 1
-			    ; optional log dir name - randomized dir will be created if none is supplied
-			    ; :log-dir "/tmp/embedded-kafka"
-			    :zookeeper-addr "127.0.0.1:2188"})))
+    (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
+                        :port 9092
+                        :embedded-kafka? embedded-kafka?
+                        :broker.id 0
+                        :zookeeper.connect "127.0.0.1:2188"
+                        :controlled.shutdown.enable false
+                        :num-partitions 1
+                        ; optional log dir name - randomized dir will be created if none is supplied
+                        ; :log-dir "/tmp/embedded-kafka"})))
 
 ;; insert code to run a test here
 

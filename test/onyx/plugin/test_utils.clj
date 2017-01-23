@@ -45,7 +45,7 @@
   ([topic zookeeper xs]
    (mock-kafka topic zookeeper xs (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))))
   ([topic zookeeper xs log-dir]
-   (mock-kafka topic zookeeper xs (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) true))
+   (mock-kafka topic zookeeper xs log-dir true))
   ([topic zookeeper xs log-dir embedded-kafka?]
    (let [kafka-server (component/start
                        (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
