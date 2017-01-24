@@ -77,7 +77,9 @@
       (onyx.test-helper/validate-enough-peers! test-env job)
       (test-utils/create-topic zk-address test-topic 2)
       (write-messages test-topic zk-address)
-      (onyx.api/submit-job peer-config job)
-      (Thread/sleep 2000)
-      (write-messages test-topic zk-address)
-      (is (= 15 (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000))))))))
+      (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
+        (Thread/sleep 2000)
+        (write-messages test-topic zk-address)
+        (is (= 15 (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000)))))
+        (onyx.api/kill-job peer-config job-id)
+        (Thread/sleep 10000)))))

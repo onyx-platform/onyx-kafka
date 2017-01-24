@@ -162,6 +162,7 @@
 
   (recover! [this replica-version checkpoint]
     (set! drained false)
+    (set! iter nil)
     (seek-offset! log-prefix consumer kpartition task-map topic checkpoint)
     this)
 
@@ -183,10 +184,10 @@
           (do
            (set! offset new-offset) 
            deserialized))) 
-      (do (set! iter (.iterator ^ConsumerRecords 
-                                (.poll ^Consumer 
-                                       (.consumer ^FranzConsumer consumer) 
-                                       batch-timeout)))
+      (do (set! iter 
+                (.iterator ^ConsumerRecords 
+                           (.poll ^Consumer (.consumer ^FranzConsumer consumer) 
+                                  batch-timeout)))
           nil)))
 
   (completed? [this]

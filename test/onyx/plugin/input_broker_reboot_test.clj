@@ -22,7 +22,7 @@
                                            :onyx/fn :clojure.core/identity
                                            :onyx/type :function}
                                           batch-settings)]
-                         :lifecycles [{:lifecycle/task :read-messages
+                         :lifecycles [{:lifecycle/task :all
                                        :lifecycle/calls ::restartable-reader}]
                          :windows []
                          :triggers []
@@ -69,21 +69,20 @@
         {:keys [out read-messages]} (get-core-async-channels job)
         test-data1 [{:n 1}]
         test-data2 [{:n 2} {:n 3} {:n 4} {:n 5} {:n 6} :done]
-        input-chan (chan 10)
         mock (atom {})
         _ (test-utils/create-topic zk-address test-topic)]
     (with-test-env [test-env [4 env-config peer-config]]
       (onyx.test-helper/validate-enough-peers! test-env job)
-      (doseq [x test-data1] (>!! input-chan x))
-      (test-utils/write-data test-topic zk-address input-chan)
-      (onyx.api/submit-job peer-config job)
-      (Thread/sleep 10000)
-      (stop-kafka mock embedded-kafka?)
-      (Thread/sleep 20000)
-      (start-kafka mock embedded-kafka?)
-      ;; wait for long enough before putting onto the input channel
-      ;; otherwise it'll try to write to kafka before it's back up
-      (Thread/sleep 40000)
-      (doseq [x test-data2] (>!! input-chan x))
-      (is (= (disj (set (into test-data1 test-data2)) :done)
-             (set (onyx.plugin.core-async/take-segments! out 20000)))))))
+      (test-utils/write-data test-topic zk-address test-data1)
+      (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
+        (Thread/sleep 10000)
+        (stop-kafka mock embedded-kafka?)
+        (Thread/sleep 20000)
+        (start-kafka mock embedded-kafka?)
+        ;; wait for long enough before putting onto the input channel
+        ;; otherwise it'll try to write to kafka before it's back up
+        (Thread/sleep 60000)
+        (test-utils/write-data test-topic zk-address test-data2)
+        (onyx.test-helper/feedback-exception! peer-config job-id)
+        (is (= (disj (set (into test-data1 test-data2)) :done)
+               (set (onyx.plugin.core-async/take-segments! out 50))))))))
