@@ -260,6 +260,8 @@
   (recover! [this _ _] 
     this)
 
+  (checkpoint [this])
+
   (prepare-batch [this event replica]
     true)
 
