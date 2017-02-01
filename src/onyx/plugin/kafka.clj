@@ -130,7 +130,7 @@
           brokers (find-brokers task-map)
           _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
           consumer-config (merge {:bootstrap.servers brokers
-                                  :group.id group-id
+                                  :group.id (or group-id "onyx")
                                   :enable.auto.commit false
                                   :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
                                                             (:kafka/receive-buffer-bytes defaults))
@@ -275,14 +275,15 @@
                                (send-async! producer)))))]
       (->> (:tree results)
            (sequence xf)
-           (doall)
            ;; could perform the deref in synchonized? to block less often
            (run! deref))
       true)))
 
+(def write-defaults {:kafka/request-size 307200})
+
 (defn write-messages [{:keys [onyx.core/task-map] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
-        request-size (or (get task-map :kafka/request-size) (get defaults :kafka/request-size))
+        request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
         config (merge {:bootstrap.servers (vals (id->broker (:kafka/zookeeper task-map)))
                        :max.request.size request-size}
