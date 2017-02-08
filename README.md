@@ -9,7 +9,7 @@ This plugin version is *only compatible with Kafka 0.9+*. Please use [onyx-kafka
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.9.15.1-SNAPSHOT"]
+[org.onyxplatform/onyx-kafka "0.10.0.0-technical-preview-4"]
 ```
 
 In your peer boot-up namespace:
@@ -17,6 +17,14 @@ In your peer boot-up namespace:
 ```clojure
 (:require [onyx.plugin.kafka])
 ```
+
+#### ABS TODO
+
+Currently the ABS version of this plugin does not support everything from the 0.9 plugin.
+
+The two main missing features are the ability to checkpoint offsets in a way
+that can be resumed between two jobs, and a way to reset the checkpointed
+offset.
 
 #### Functions
 
@@ -41,12 +49,9 @@ Catalog entry:
  :onyx/type :input
  :onyx/medium :kafka
  :kafka/topic "my topic"
- :kafka/group-id "onyx-consumer"
  :kafka/receive-buffer-bytes 65536
  :kafka/zookeeper "127.0.0.1:2181"
  :kafka/offset-reset :earliest
- :kafka/force-reset? true
- :kafka/commit-interval 500
  :kafka/deserializer-fn :my.ns/deserializer-fn
  :kafka/wrap-with-metadata? false
  ;; :kafka/start-offsets {p1 offset1, p2, offset2}
@@ -70,12 +75,9 @@ Lifecycle entry:
 |-----------------------------|-----------|---------|------------
 |`:kafka/topic`               | `string`  |         | The topic name to connect to
 |`:kafka/partition`           | `string`  |         | Optional: partition to read from if auto-assignment is not used
-|`:kafka/group-id`            | `string`  |         | The consumer identity to store in ZooKeeper
 |`:kafka/zookeeper`           | `string`  |         | The ZooKeeper connection string
 |`:kafka/offset-reset`        | `keyword` |         | Offset bound to seek to when not found - `:earliest` or `:latest`
-|`:kafka/force-reset?`        | `boolean` |         | Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the last acknowledged messsage if it exists
 |`:kafka/receive-buffer-bytes`| `integer` |`65536`  | The size in the receive buffer in the Kafka consumer.
-|`:kafka/commit-interval`     | `integer` |`2000`   | The interval in milliseconds to commit the latest acknowledged offset to ZooKeeper
 |`:kafka/deserializer-fn`     | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
 |`:kafka/wrap-with-metadata?` | `boolean` |`false`  | Wraps message into map with keys `:offset`, `:partitions`, `:topic` and `:message` itself
 |`:kafka/start-offsets`       | `map`     |         | Allows a task to be supplied with the starting offsets for all partitions. Maps partition to offset, e.g. `{0 50, 1, 90}` will start at offset 50 for partition 0, and offset 90 for partition 1
@@ -125,7 +127,7 @@ key values.
 |`:kafka/topic`              | `string`  |         | The topic name to connect to
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
 |`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
-|`:kafka/request-size`       | `number`  |         | The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer.
+|`:kafka/request-size`       | `number`  |`307200` | The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer.
 |`:kafka/no-seal?`           | `boolean` |`false`  | Do not write :done to the topic when task receives the sentinel signal (end of batch job)
 |`:kafka/producer-opts`      | `map`     |         | A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`.
 
@@ -144,7 +146,7 @@ topic, this will hang forever as there is no timeout.
 
 ;; retrieve the segments on the topic
 (def results
-  (kpu/take-segments (:zookeeper/addr peer-config) "yourtopic" your-decompress-fn))
+  (kpu/take-segments (:zookeeper/address peer-config) "yourtopic" your-decompress-fn))
 
 (last results)
 ; :done
@@ -166,13 +168,15 @@ This can be used like so:
 
 (def kafka-server
   (component/start
-    (ke/map->EmbeddedKafka {:hostname "127.0.0.1"
-                            :port 9092
-                            :broker-id 0
-			    :num-partitions 1
-			    ; optional log dir name - randomized dir will be created if none is supplied
-			    ; :log-dir "/tmp/embedded-kafka"
-			    :zookeeper-addr "127.0.0.1:2188"})))
+    (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
+                        :port 9092
+                        :embedded-kafka? embedded-kafka?
+                        :broker.id 0
+                        :zookeeper.connect "127.0.0.1:2188"
+                        :controlled.shutdown.enable false
+                        :num-partitions 1
+                        ; optional log dir name - randomized dir will be created if none is supplied
+                        ; :log-dir "/tmp/embedded-kafka"})))
 
 ;; insert code to run a test here
 

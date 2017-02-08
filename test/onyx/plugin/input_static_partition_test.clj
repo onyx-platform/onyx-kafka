@@ -31,7 +31,6 @@
                                        :kafka/group-id "onyx-consumer"
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :earliest
-                                       :kafka/force-reset? true
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
                                        :onyx/min-peers 1
                                        :onyx/max-peers 1}
@@ -48,15 +47,12 @@
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         job (build-job zk-address test-topic 10 1000)
         {:keys [out read-messages]} (get-core-async-channels job)
-        test-data [{:n 1} {:n 2} {:n 3} :done]
-        mock (atom {})]
-    (try
+        test-data [{:n 1} {:n 2} {:n 3} :done]]
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (reset! mock (test-utils/mock-kafka test-topic zk-address test-data (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID)) (:embedded-kafka? test-config)))
+        (test-utils/write-data test-topic zk-address test-data)
         (->> (onyx.api/submit-job peer-config job)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))
-        (is (= test-data
-               (onyx.plugin.core-async/take-segments! out))))
-      (finally (swap! mock component/stop)))))
+        (is (= (butlast test-data)
+               (onyx.plugin.core-async/take-segments! out 50))))))
