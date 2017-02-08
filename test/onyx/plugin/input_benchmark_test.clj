@@ -43,7 +43,7 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition 1000000)
+(def messages-per-partition 500000)
 (def n-partitions 1)
 
 (defn print-message [segment]
