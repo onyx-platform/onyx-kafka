@@ -36,27 +36,13 @@
     partitions
     ;; Replication factor needs to be set because we're only running a single
     ;; embedded Kafka server.
-    1
-    )))
+    1)))
 
-(defn mock-kafka
+(defn write-data
   "Starts a Kafka in-memory instance, preloading a topic with xs.
    If xs is a channel, will load the topic with items off the channel."
   ([topic zookeeper xs]
-   (mock-kafka topic zookeeper xs (str "/tmp/embedded-kafka" (java.util.UUID/randomUUID))))
-  ([topic zookeeper xs log-dir]
-   (mock-kafka topic zookeeper xs log-dir true))
-  ([topic zookeeper xs log-dir embedded-kafka?]
-   (let [kafka-server (component/start
-                       (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
-                                           :port 9092
-                                           :embedded-kafka? embedded-kafka?
-                                           :broker.id 0
-                                           :log.dir log-dir
-                                           :zookeeper.connect zookeeper
-                                           :controlled.shutdown.enable false}))
-         _ (create-topic zookeeper topic)
-         config {:bootstrap.servers ["127.0.0.1:9092"]}
+   (let [config {:bootstrap.servers ["127.0.0.1:9092"]}
          key-serializer (byte-array-serializer)
          value-serializer (byte-array-serializer)
          prod (producer/make-producer config key-serializer value-serializer)]
@@ -69,5 +55,4 @@
                   (do
                    (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str itm))))
                    (recur (<! xs)))
-                  (.close prod))))
-     kafka-server)))
+                  (.close prod)))))))

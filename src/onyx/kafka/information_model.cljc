@@ -28,6 +28,8 @@
 
              :kafka/force-reset?
              {:doc "Force to read from the beginning or end of the log, as specified by `:kafka/offset-reset`. If false, reads from the last acknowledged messsage if it exists."
+              :deprecation-version "0.9.10.0"
+              :deprecation-doc ":kafka/force-reset? deprecated as this functionality has been subsumed by onyx resume-point."
               :type :boolean}
 
              :kafka/chan-capacity

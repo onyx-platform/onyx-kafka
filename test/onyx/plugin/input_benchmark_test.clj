@@ -15,7 +15,7 @@
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
             [onyx.kafka.embedded-server :as ke]
-            [onyx.kafka.utils :refer [take-until-done]]
+            [onyx.kafka.utils]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
@@ -43,7 +43,7 @@
 (defn decompress [x]
   (nip/thaw x decompress-opts))
 
-(def messages-per-partition 200000)
+(def messages-per-partition 1000000)
 (def n-partitions 1)
 
 (defn print-message [segment]
@@ -73,13 +73,11 @@
                              :kafka/group-id "onyx-consumer-1"
                              :kafka/zookeeper zk-address
                              :kafka/offset-reset :earliest
-                             :kafka/force-reset? true
                              :kafka/receive-buffer-bytes 65536
                              :kafka/deserializer-fn ::decompress
                              :onyx/fn ::print-message
-                             :onyx/batch-timeout 500
+                             :onyx/batch-timeout 50
                              :onyx/batch-size batch-size
-                             :onyx/max-pending 10000
                              :onyx/min-peers n-partitions
                              :onyx/max-peers n-partitions}))
         (add-task (core-async/output :out 
@@ -87,9 +85,7 @@
                                       :onyx/batch-size batch-size}
                                      100000000)))))
 
-(defn mock-kafka
-  "Use a custom version of mock-kafka as opposed to the one in test-utils
-  because we need to spawn 2 producers in order to write to each partition"
+(defn write-data
   [topic zookeeper]
   (let [zk-utils (k-admin/make-zk-utils {:servers [zookeeper]} false)
         _ (k-topics/create-topic! zk-utils topic n-partitions)
@@ -132,18 +128,21 @@
         {:keys [out read-messages]} (get-core-async-channels job)]
     (try
      (println "Topic is " test-topic)
-     (mock-kafka test-topic zk-address)
-     (Thread/sleep 10000)
+     (write-data test-topic zk-address)
+     ;; Appropriate time to settle before submitting the job
+     (Thread/sleep 5000)
      (let [job-ret (onyx.api/submit-job peer-config job)
            _ (println "Job ret" job-ret)
            job-id (:job-id job-ret)
            start-time (System/currentTimeMillis)
-           read-nothing-timeout 10000
+           read-nothing-timeout 30000
            read-segments (take-until-nothing! out read-nothing-timeout)]
        (is (= (* n-partitions messages-per-partition) (count read-segments))) 
        (let [run-time (- (System/currentTimeMillis) start-time read-nothing-timeout)
              n-messages-total (* n-partitions messages-per-partition)]
-         (println (float (* 1000 (/ n-messages-total run-time))) "messages per second. Processed" n-messages-total "messages in" run-time "ms."))
+         (println (float (* 1000 (/ n-messages-total run-time))) 
+                  "messages per second. Processed" n-messages-total 
+                  "messages in" run-time "ms."))
        (onyx.api/kill-job peer-config job-id))
      (finally 
       (doseq [p v-peers]
