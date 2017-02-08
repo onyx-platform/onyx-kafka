@@ -31,7 +31,7 @@
                    :java-opts ^:replace ["-server"
                                          "-XX:+UseG1GC"
                                          "-XX:-OmitStackTraceInFastThrow"
-                                         "-Xmx3g"
+                                         "-Xmx2g"
                                          "-Daeron.client.liveness.timeout=50000000000"
                                          "-XX:+UnlockCommercialFeatures" 
                                          "-XX:+FlightRecorder"
