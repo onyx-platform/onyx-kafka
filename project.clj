@@ -14,7 +14,7 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
                  [org.onyxplatform/onyx "0.10.0-beta1"]
-                 [org.onyxplatform/franzy-admin "0.0.4" :exclusions [org.slf4j/slf4j-log4j12]]
+                 [org.onyxplatform/franzy-admin "0.0.5" :exclusions [org.slf4j/slf4j-log4j12]]
                  [mastondonc/franzy "0.0.3"]
                  [com.stuartsierra/component "0.2.3"]]
   :profiles {:dev {:dependencies [[cheshire "5.5.0"]
