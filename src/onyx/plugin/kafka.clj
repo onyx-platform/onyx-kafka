@@ -262,7 +262,7 @@
 
   (checkpoint [this])
 
-  (prepare-batch [this event replica]
+  (prepare-batch [this event replica _]
     true)
 
   (checkpointed! [this epoch])
