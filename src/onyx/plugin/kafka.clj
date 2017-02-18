@@ -10,6 +10,7 @@
             [franzy.clients.producer.types :refer [make-producer-record]]
             [franzy.clients.consumer.protocols :as proto]
             [franzy.clients.consumer.client :as consumer]
+            [franzy.clients.producer.callbacks :refer [send-callback]]
             [franzy.common.metadata.protocols :as metadata]
             [franzy.clients.consumer.protocols :refer [assign-partitions! commit-offsets-sync!
                                                        poll! seek-to-offset!] :as cp]
@@ -31,6 +32,7 @@
   (:import (org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord)
            (org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer)
            (franzy.clients.consumer.client FranzConsumer)
+           (org.apache.kafka.clients.producer Callback)
            [franzy.clients.producer.types ProducerRecord]
            [org.apache.kafka.common TopicPartition]
            [clojure.core.async.impl.channels ManyToManyChannel]))
@@ -174,9 +176,7 @@
   (poll! [this _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
-            new-offset (if rec
-                         (.offset rec)
-                         offset)
+            new-offset (if rec (.offset rec) offset)
             deserialized (some-> rec (.value) deserializer-fn)]
         (if (= :done deserialized)
           (do (set! drained true)
@@ -194,7 +194,7 @@
     drained))
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
-  (let [{:keys [kafka/topic kafka/deserializer-fn]} task-map ;; fixme onyx.core
+  (let [{:keys [kafka/topic kafka/deserializer-fn]} task-map
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
         deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
@@ -243,7 +243,7 @@
           :else
           (ProducerRecord. message-topic p k (serializer-fn message)))))
 
-(defrecord KafkaWriteMessages [task-map config topic producer serializer-fn]
+(defrecord KafkaWriteMessages [task-map config topic producer serializer-fn write-futures exception write-callback]
   p/Plugin
   (start [this event] 
     ;; move producer creation to in here
@@ -255,7 +255,9 @@
 
   o/Output
   (synced? [this epoch]
-    true)
+    (empty? 
+     (vswap! write-futures 
+             (fn [fs] (doall (remove realized? fs))))))
 
   (recover! [this _ _] 
     this)
@@ -268,18 +270,24 @@
   (checkpointed! [this epoch])
 
   (write-batch [this {:keys [onyx.core/results]} replica _]
-    (let [xf (comp (mapcat :leaves)
-                   (map (fn [msg]
-                          (->> msg
-                               (message->producer-record serializer-fn topic)
-                               (send-async! producer)))))]
-      (->> (:tree results)
-           (sequence xf)
-           ;; could perform the deref in synchonized? to block less often
-           (run! deref))
-      true)))
+    (when @exception (throw @exception))
+    (vswap! write-futures 
+            (fn [fs]
+              (into (doall (remove realized? fs))
+                    (comp (mapcat :leaves)
+                          (map (fn [msg]
+                                 (send-async! producer 
+                                              (message->producer-record serializer-fn topic msg)
+                                              {:send-callback write-callback}))))
+                    (:tree results))))
+    true))
 
 (def write-defaults {:kafka/request-size 307200})
+
+(deftype ExceptionCallback [e]
+  Callback
+  (onCompletion [_ v exception]
+    (reset! e exception)))
 
 (defn write-messages [{:keys [onyx.core/task-map] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
@@ -292,8 +300,12 @@
         key-serializer (byte-array-serializer)
         value-serializer (byte-array-serializer)
         producer (producer/make-producer config key-serializer value-serializer)
-        serializer-fn (kw->fn (:kafka/serializer-fn task-map))]
-    (->KafkaWriteMessages task-map config topic producer serializer-fn)))
+        serializer-fn (kw->fn (:kafka/serializer-fn task-map))
+        exception (atom nil)
+        write-callback (->ExceptionCallback exception)
+        write-futures (volatile! (list))]
+    (->KafkaWriteMessages task-map config topic producer serializer-fn 
+                          write-futures exception write-callback)))
 
 (defn read-handle-exception [event lifecycle lf-kw exception]
   (if (false? (:recoverable? (ex-data exception)))
