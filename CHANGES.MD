@@ -1,3 +1,6 @@
+#### 0.10.0.0-beta2
+* Greatly improve kafka output performance.
+
 #### 0.9.15.1
 * Major bug fix: peer recovery may lose messages that were read but were unacked
 
