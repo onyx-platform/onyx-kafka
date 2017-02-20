@@ -13,7 +13,7 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.10.0-20170219_214118-g37e44ca"]
+                 [org.onyxplatform/onyx "0.10.0-20170220_213632-gb4c0179"]
                  [org.onyxplatform/franzy-admin "0.0.6" :exclusions [org.slf4j/slf4j-log4j12]]
                  [mastondonc/franzy "0.0.3"]
                  [com.stuartsierra/component "0.2.3"]]
