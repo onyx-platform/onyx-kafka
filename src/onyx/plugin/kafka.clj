@@ -19,9 +19,7 @@
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [onyx.plugin.protocols.plugin :as p]
-            [onyx.plugin.protocols.input :as i]
-            [onyx.plugin.protocols.output :as o]
+            [onyx.plugin.protocols :as p]
             [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.util :refer [kw->fn]]
             [onyx.extensions :as extensions]
@@ -158,7 +156,7 @@
       (set! consumer nil))
     this)
 
-  i/Input
+  p/Checkpointed
   (checkpoint [this]
     offset)
 
@@ -168,11 +166,16 @@
     (seek-offset! log-prefix consumer kpartition task-map topic checkpoint)
     this)
 
+  (checkpointed! [this epoch])
+
+  p/BarrierSynchronization
   (synced? [this epoch]
     true)
 
-  (checkpointed! [this epoch])
+  (completed? [this]
+    drained)
 
+  p/Input
   (poll! [this _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
@@ -188,10 +191,7 @@
                 (.iterator ^ConsumerRecords 
                            (.poll ^Consumer (.consumer ^FranzConsumer consumer) 
                                   batch-timeout)))
-          nil)))
-
-  (completed? [this]
-    drained))
+          nil))))
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
   (let [{:keys [kafka/topic kafka/deserializer-fn]} task-map
@@ -243,32 +243,35 @@
           :else
           (ProducerRecord. message-topic p k (serializer-fn message)))))
 
+(defn clear-write-futures! [write-futures]
+  (vswap! write-futures 
+          (fn [fs] (doall (remove realized? fs)))))
+
 (defrecord KafkaWriteMessages [task-map config topic producer serializer-fn write-futures exception write-callback]
   p/Plugin
   (start [this event] 
-    ;; move producer creation to in here
     this)
 
   (stop [this event] 
     (.close producer)
     this)
 
-  o/Output
+  p/BarrierSynchronization
   (synced? [this epoch]
-    (empty? 
-     (vswap! write-futures 
-             (fn [fs] (doall (remove realized? fs))))))
+    (empty? (clear-write-futures! write-futures)))
 
+  (completed? [this]
+    (empty? (clear-write-futures! write-futures)))
+
+  p/Checkpointed
   (recover! [this _ _] 
     this)
-
   (checkpoint [this])
-
-  (prepare-batch [this event replica _]
-    true)
-
   (checkpointed! [this epoch])
 
+  p/Output
+  (prepare-batch [this event replica _]
+    true)
   (write-batch [this {:keys [onyx.core/results]} replica _]
     (when @exception (throw @exception))
     (vswap! write-futures 
