@@ -9,7 +9,7 @@ This plugin version is *only compatible with Kafka 0.9+*. Please use [onyx-kafka
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.10.0.0-technical-preview-4"]
+[org.onyxplatform/onyx-kafka "0.10.0.0-SNAPSHOT"]
 ```
 
 In your peer boot-up namespace:
@@ -17,14 +17,6 @@ In your peer boot-up namespace:
 ```clojure
 (:require [onyx.plugin.kafka])
 ```
-
-#### ABS TODO
-
-Currently the ABS version of this plugin does not support everything from the 0.9 plugin.
-
-The two main missing features are the ability to checkpoint offsets in a way
-that can be resumed between two jobs, and a way to reset the checkpointed
-offset.
 
 #### Functions
 
