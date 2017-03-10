@@ -30,10 +30,10 @@
   (:import (org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord)
            (org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer)
            (franzy.clients.consumer.client FranzConsumer)
+           [java.util.concurrent.atomic AtomicLong]
            (org.apache.kafka.clients.producer Callback)
            [franzy.clients.producer.types ProducerRecord]
-           [org.apache.kafka.common TopicPartition]
-           [clojure.core.async.impl.channels ManyToManyChannel]))
+           [org.apache.kafka.common TopicPartition]))
 
 (def defaults
   {:kafka/receive-buffer-bytes 65536
@@ -46,8 +46,8 @@
         start-offsets (:kafka/start-offsets task-map)]
     (cond checkpoint
           (do
-           (info log-prefix "Seeking to checkpointed offset at:" checkpoint)
-           (seek-to-offset! consumer {:topic topic :partition kpartition} checkpoint))
+           (info log-prefix "Seeking to checkpointed offset at:" (inc checkpoint))
+           (seek-to-offset! consumer {:topic topic :partition kpartition} (inc checkpoint)))
 
           start-offsets
           (let [offset (get start-offsets kpartition)]
@@ -122,7 +122,7 @@
 
 (deftype KafkaReadMessages 
   [log-prefix task-map topic ^:unsynchronized-mutable kpartition batch-timeout
-   deserializer-fn segment-fn ^:unsynchronized-mutable consumer 
+   deserializer-fn segment-fn read-offset ^:unsynchronized-mutable consumer 
    ^:unsynchronized-mutable iter ^:unsynchronized-mutable offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
@@ -163,6 +163,7 @@
   (recover! [this replica-version checkpoint]
     (set! drained false)
     (set! iter nil)
+    (set! offset checkpoint)
     (seek-offset! log-prefix consumer kpartition task-map topic checkpoint)
     this)
 
@@ -180,11 +181,12 @@
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             new-offset (if rec (.offset rec) offset)
-            deserialized (some-> rec (.value) deserializer-fn)]
+            deserialized (some-> rec segment-fn)]
         (if (= :done deserialized)
           (do (set! drained true)
               nil)
           (do
+           (.set ^AtomicLong read-offset new-offset)
            (set! offset new-offset) 
            deserialized))) 
       (do (set! iter 
@@ -193,7 +195,7 @@
                                   batch-timeout)))
           nil))))
 
-(defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
+(defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
   (let [{:keys [kafka/topic kafka/deserializer-fn]} task-map
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
@@ -206,9 +208,10 @@
                         :message (deserializer-fn (.value cr))
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
-                       (deserializer-fn (.value cr))))]
+                       (deserializer-fn (.value cr))))
+        read-offset (:read-offset monitoring)]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
-                         deserializer-fn segment-fn nil nil nil false)))
+                         deserializer-fn segment-fn read-offset nil nil nil false)))
 
 (defn close-read-messages
   [event lifecycle]
