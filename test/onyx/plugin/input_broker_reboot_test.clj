@@ -57,7 +57,7 @@
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
 
-(deftest ^:broker-reboot kafka-broker-reboot-test
+#_(deftest ^:broker-reboot kafka-broker-reboot-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         embedded-kafka? (:embedded-kafka? test-config)
