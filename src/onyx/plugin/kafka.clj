@@ -122,7 +122,7 @@
     (let [n-slots (or (:onyx/n-peers task-map) (:onyx/max-peers task-map))
           [lower upper] (partitions-for-slot n-partitions n-slots slot)
           parts-range (range lower (inc upper))
-          parts (map (fn [p] [{:topic topic :partition p}]) parts-range)]
+          parts (map (fn [p] {:topic topic :partition p}) parts-range)]
       (cp/assign-partitions! consumer* parts)
       parts-range)))
 

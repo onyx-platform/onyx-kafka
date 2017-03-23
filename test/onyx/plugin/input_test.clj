@@ -1,24 +1,13 @@
 (ns onyx.plugin.input-test
-  (:require [clojure.core.async :refer [<!! go pipe]]
-            [clojure.core.async.lab :refer [spool]]
-            [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
             [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.cluster :as k-cluster]
-
-            ;; added
             [franzy.admin.topics :as k-topics]
-            [franzy.clients.consumer.protocols :refer [poll! assign-partitions!]]
-            [franzy.clients.consumer.client :as c]
-
-            [franzy.admin.configuration :as k-config]
             [franzy.serialization.serializers :refer [byte-array-serializer]]
-            [franzy.serialization.deserializers :refer [byte-array-deserializer]]
             [franzy.clients.producer.client :as producer]
-            [franzy.clients.producer.protocols :refer [send-sync! send-async!]]
+            [franzy.clients.producer.protocols :refer [send-sync!]]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.embedded-server :as ke]
             [onyx.kafka.utils]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
