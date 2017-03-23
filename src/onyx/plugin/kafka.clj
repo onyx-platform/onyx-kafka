@@ -1,37 +1,28 @@
 (ns onyx.plugin.kafka
-  (:require [clojure.core.async :as a :refer [chan >!! <!! close! timeout sliding-buffer]]
-            [franzy.admin.cluster :as k-cluster]
+  (:require [franzy.admin.cluster :as k-cluster]
             [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.partitions :as k-partitions]
             [franzy.serialization.serializers :refer [byte-array-serializer]]
             [franzy.serialization.deserializers :refer [byte-array-deserializer]]
             [franzy.clients.producer.client :as producer]
             [franzy.clients.producer.protocols :refer [send-async! send-sync!]]
             [franzy.clients.producer.types :refer [make-producer-record]]
-            [franzy.clients.consumer.protocols :as proto]
             [franzy.clients.consumer.client :as consumer]
             [franzy.clients.producer.callbacks :refer [send-callback]]
             [franzy.common.metadata.protocols :as metadata]
-            [franzy.clients.consumer.protocols :refer [assign-partitions! commit-offsets-sync!
-                                                       poll! seek-to-offset!] :as cp]
-            [onyx.log.curator :as zk]
+            [franzy.clients.consumer.protocols :refer [assign-partitions! seek-to-offset!] :as cp]
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [taoensso.timbre :as log :refer [fatal info]]
-            [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.plugin.protocols :as p]
-            [onyx.static.uuid :refer [random-uuid]]
             [onyx.static.util :refer [kw->fn]]
-            [onyx.extensions :as extensions]
-            [onyx.types :as t]
             [onyx.tasks.kafka]
             [schema.core :as s]
             [onyx.api])
-  (:import (org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord)
-           (org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer)
-           (franzy.clients.consumer.client FranzConsumer)
+  (:import [org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord]
+           [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer]
+           [franzy.clients.consumer.client FranzConsumer]
            [java.util.concurrent.atomic AtomicLong]
-           (org.apache.kafka.clients.producer Callback)
+           [org.apache.kafka.clients.producer Callback]
            [franzy.clients.producer.types ProducerRecord]
            [org.apache.kafka.common TopicPartition]))
 
