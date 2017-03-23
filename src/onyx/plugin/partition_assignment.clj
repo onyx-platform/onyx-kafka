@@ -43,6 +43,10 @@
 ;;  2   5, 6
 ;;
 (defn partitions-for-slot [n-partitions n-peers my-slot]
+  (when (> n-peers n-partitions)
+    (throw (ex-info "Number of peers assigned to this task exceeds the number of partitions in the Topic. It must be less than or equal to it."
+                    {:n-partitions n-partitions
+                     :n-peers n-peers})))
   (let [at-least (long (/ n-partitions n-peers))
         left-over (mod n-partitions n-peers)
         my-extra (if (<= (inc my-slot) left-over) 1 0)
