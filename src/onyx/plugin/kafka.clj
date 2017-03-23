@@ -9,8 +9,9 @@
             [franzy.clients.consumer.client :as consumer]
             [franzy.clients.producer.callbacks :refer [send-callback]]
             [franzy.common.metadata.protocols :as metadata]
-            [franzy.clients.consumer.protocols :refer [assign-partitions! seek-to-offset!] :as cp]
+            [franzy.clients.consumer.protocols :refer [seek-to-offset!] :as cp]
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
+            [onyx.plugin.partition-assignment :refer [partitions-for-slot]]
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.plugin.protocols :as p]
@@ -18,13 +19,14 @@
             [onyx.tasks.kafka]
             [schema.core :as s]
             [onyx.api])
-  (:import [org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord]
+  (:import [java.util.concurrent.atomic AtomicLong]
+           [org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord]
            [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer]
-           [franzy.clients.consumer.client FranzConsumer]
-           [java.util.concurrent.atomic AtomicLong]
+           [org.apache.kafka.common TopicPartition]
            [org.apache.kafka.clients.producer Callback]
-           [franzy.clients.producer.types ProducerRecord]
-           [org.apache.kafka.common TopicPartition]))
+           [franzy.clients.consumer.client FranzConsumer]
+           [franzy.clients.producer.client FranzProducer]
+           [franzy.clients.producer.types ProducerRecord]))
 
 (def defaults
   {:kafka/receive-buffer-bytes 65536
@@ -32,35 +34,36 @@
    :kafka/wrap-with-metadata? false
    :kafka/unable-to-find-broker-backoff-ms 8000})
 
-(defn seek-offset! [log-prefix consumer kpartition task-map topic checkpoint]
+(defn seek-offset! [log-prefix consumer kpartitions task-map topic checkpoint]
   (let [policy (:kafka/offset-reset task-map)
         start-offsets (:kafka/start-offsets task-map)]
-    (cond checkpoint
-          (do
-           (info log-prefix "Seeking to checkpointed offset at:" (inc checkpoint))
-           (seek-to-offset! consumer {:topic topic :partition kpartition} (inc checkpoint)))
+    (doseq [kpartition kpartitions]
+      (cond checkpoint
+            (do
+              (info log-prefix "Seeking to checkpointed offset at:" (inc checkpoint))
+              (seek-to-offset! consumer {:topic topic :partition kpartition} (inc checkpoint)))
 
-          start-offsets
-          (let [offset (get start-offsets kpartition)]
-            (when-not offset
-              (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets" 
-                              {:missing-partition kpartition
-                               :kafka/start-offsets start-offsets})))
-            (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
-     
-          (= policy :earliest)
-          (do
-           (info log-prefix "Seeking to earliest offset on topic" {:topic topic :partition kpartition})
-           (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
+            start-offsets
+            (let [offset (get start-offsets kpartition)]
+              (when-not offset
+                (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets"
+                                {:missing-partition kpartition
+                                 :kafka/start-offsets start-offsets})))
+              (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
 
-          (= policy :latest)
-          (do
-           (info log-prefix "Seeking to latest offset on topic" {:topic topic :partition kpartition})
-           (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
+            (= policy :earliest)
+            (do
+              (info log-prefix "Seeking to earliest offset on topic" {:topic topic :partition kpartition})
+              (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
 
-          :else
-          (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
-                                                             :policy policy})))))
+            (= policy :latest)
+            (do
+              (info log-prefix "Seeking to latest offset on topic" {:topic topic :partition kpartition})
+              (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
+
+            :else
+            (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
+                                                               :policy policy}))))))
 
 ;; kafka operations
 (defn id->broker [zk-addr]
@@ -89,6 +92,10 @@
                        {:recoverable? true
                         :zk-addr zk-addr}))))))
 
+(defn start-kafka-consumer
+  [event lifecycle]
+  {})
+
 (defn check-num-peers-equals-partitions 
   [{:keys [onyx/min-peers onyx/max-peers onyx/n-peers kafka/partition] :as task-map} n-partitions]
   (let [fixed-partition? (and partition (or (= 1 n-peers)
@@ -107,12 +114,20 @@
         (log/error e)
         (throw e)))))
 
-(defn start-kafka-consumer
-  [event lifecycle]
-  {})
+(defn assign-partitions-to-slot! [consumer* task-map topic n-partitions slot]
+  (if-let [part (:partition task-map)]
+    (let [p (Integer/parseInt part)]
+      (cp/assign-partitions! consumer* [{:topic topic :partition p}])
+      [p])
+    (let [n-slots (or (:onyx/n-peers task-map) (:onyx/max-peers task-map))
+          [lower upper] (partitions-for-slot n-partitions n-slots slot)
+          parts-range (range lower (inc upper))
+          parts (map (fn [p] [{:topic topic :partition p}]) parts-range)]
+      (cp/assign-partitions! consumer* parts)
+      parts-range)))
 
 (deftype KafkaReadMessages 
-  [log-prefix task-map topic ^:unsynchronized-mutable kpartition batch-timeout
+  [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
    deserializer-fn segment-fn read-offset ^:unsynchronized-mutable consumer 
    ^:unsynchronized-mutable iter ^:unsynchronized-mutable offset ^:unsynchronized-mutable drained]
   p/Plugin
@@ -130,20 +145,17 @@
           key-deserializer (byte-array-deserializer)
           value-deserializer (byte-array-deserializer)
           consumer* (consumer/make-consumer consumer-config key-deserializer value-deserializer)
-          kpartition* (if-let [part (:partition task-map)]
-                        (Integer/parseInt part)
-                        (:onyx.core/slot-id event))
           partitions (mapv :partition (metadata/partitions-for consumer* topic))
           n-partitions (count partitions)]
       (check-num-peers-equals-partitions task-map n-partitions)
-      (assign-partitions! consumer* [{:topic topic :partition kpartition*}])
-      (set! consumer consumer*)
-      (set! kpartition kpartition*)
-      this))
+      (let [kpartitions* (assign-partitions-to-slot! consumer* task-map topic n-partitions (:onyx.core/slot-id event))]
+        (set! consumer consumer*)
+        (set! kpartitions kpartitions*)
+        this)))
 
   (stop [this event] 
     (when consumer 
-      (.close consumer)
+      (.close ^FranzConsumer consumer)
       (set! consumer nil))
     this)
 
@@ -155,7 +167,7 @@
     (set! drained false)
     (set! iter nil)
     (set! offset checkpoint)
-    (seek-offset! log-prefix consumer kpartition task-map topic checkpoint)
+    (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint)
     this)
 
   (checkpointed! [this epoch])
@@ -247,7 +259,7 @@
     this)
 
   (stop [this event] 
-    (.close producer)
+    (.close ^FranzProducer producer)
     this)
 
   p/BarrierSynchronization
