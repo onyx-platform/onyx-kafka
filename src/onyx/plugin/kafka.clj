@@ -38,10 +38,10 @@
   (let [policy (:kafka/offset-reset task-map)
         start-offsets (:kafka/start-offsets task-map)]
     (doseq [kpartition kpartitions]
-      (cond checkpoint
-            (do
-              (info log-prefix "Seeking to checkpointed offset at:" (inc checkpoint))
-              (seek-to-offset! consumer {:topic topic :partition kpartition} (inc checkpoint)))
+      (cond (get checkpoint kpartition)
+            (let [offset (get checkpoint kpartition)]
+              (info log-prefix "Seeking to checkpointed offset at:" (inc offset))
+              (seek-to-offset! consumer {:topic topic :partition kpartition} (inc offset)))
 
             start-offsets
             (let [offset (get start-offsets kpartition)]
@@ -129,7 +129,7 @@
 (deftype KafkaReadMessages 
   [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
    deserializer-fn segment-fn read-offset ^:unsynchronized-mutable consumer 
-   ^:unsynchronized-mutable iter ^:unsynchronized-mutable offset ^:unsynchronized-mutable drained]
+   ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
     (let [{:keys [kafka/group-id kafka/consumer-opts]} task-map
@@ -161,12 +161,12 @@
 
   p/Checkpointed
   (checkpoint [this]
-    offset)
+    partition->offset)
 
   (recover! [this replica-version checkpoint]
     (set! drained false)
     (set! iter nil)
-    (set! offset checkpoint)
+    (set! partition->offset checkpoint)
     (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint)
     this)
 
@@ -183,15 +183,16 @@
   (poll! [this _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
-            new-offset (if rec (.offset rec) offset)
             deserialized (some-> rec segment-fn)]
-        (if (= :done deserialized)
-          (do (set! drained true)
-              nil)
-          (do
-           (.set ^AtomicLong read-offset new-offset)
-           (set! offset new-offset) 
-           deserialized))) 
+        (cond (= :done deserialized)
+              (do (set! drained true)
+                  nil)
+              deserialized
+              (let [new-offset (.offset rec)
+                    part (.partition rec)]
+                (.set ^AtomicLong read-offset new-offset)
+                (set! partition->offset (assoc partition->offset part new-offset))
+                deserialized)))
       (do (set! iter 
                 (.iterator ^ConsumerRecords 
                            (.poll ^Consumer (.consumer ^FranzConsumer consumer) 
