@@ -28,11 +28,6 @@ only one partition will be read from. `:onyx/min-peers` and `:onyx/max-peers`
 must be used to fix the number of the peers for the task to the number of
 partitions read by the task.
 
-NOTE: The `:done` sentinel (i.e. batch processing) is not supported if more
-than one partition is auto-assigned i.e. the topic has more than one partition
-and `:kafka/partition` is not fixed. An exception will be thrown if a `:done`
-is read under this circumstance.
-
 Catalog entry:
 
 ```clojure
