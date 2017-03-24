@@ -26,6 +26,7 @@
 (s/defn create-topic
   ([zk-address topic-name] (create-topic zk-address topic-name 1))
   ([zk-address :- s/Str topic-name :- s/Str partitions :- s/Int]
+   (println "CREATINGTOPIC")
    (log/info {:msg "Creating new topic"
               :zk-address zk-address
               :topic-name topic-name

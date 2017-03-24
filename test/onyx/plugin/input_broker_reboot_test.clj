@@ -35,7 +35,7 @@
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :earliest
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
-                                       :onyx/max-peers 1
+                                       :onyx/n-peers 2
                                        :onyx/batch-size 2}
                                       batch-settings)))
         (add-task (core-async/output :out batch-settings)))))
@@ -57,7 +57,7 @@
 (def restartable-reader
   {:lifecycle/handle-exception (constantly :restart)})
 
-#_(deftest ^:broker-reboot kafka-broker-reboot-test
+(deftest ^:broker-reboot kafka-broker-reboot-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         embedded-kafka? (:embedded-kafka? test-config)
@@ -68,9 +68,9 @@
         job (build-job zk-address test-topic 2 1000)
         {:keys [out read-messages]} (get-core-async-channels job)
         test-data1 [{:n 1}]
-        test-data2 [{:n 2} {:n 3} {:n 4} {:n 5} {:n 6} :done]
+        test-data2 [{:n 2} {:n 3} {:n 4} {:n 5} {:n 6}]
         mock (atom {})
-        _ (test-utils/create-topic zk-address test-topic)]
+        _ (test-utils/create-topic zk-address test-topic 2)]
     (with-test-env [test-env [4 env-config peer-config]]
       (onyx.test-helper/validate-enough-peers! test-env job)
       (test-utils/write-data test-topic zk-address test-data1)
@@ -83,6 +83,6 @@
         ;; otherwise it'll try to write to kafka before it's back up
         (Thread/sleep 60000)
         (test-utils/write-data test-topic zk-address test-data2)
-        (onyx.test-helper/feedback-exception! peer-config job-id)
-        (is (= (disj (set (into test-data1 test-data2)) :done)
-               (set (onyx.plugin.core-async/take-segments! out 50))))))))
+        ;(onyx.test-helper/feedback-exception! peer-config job-id)
+        (is (= (set (into test-data1 test-data2))
+               (set (onyx.plugin.core-async/take-segments! out 20000))))))))
