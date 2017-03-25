@@ -16,7 +16,7 @@ dependencies:
 test:
   override:
     - lein test:
-        timeout: 480
+        timeout: 640
     - cp localrecording.jfr $CIRCLE_ARTIFACTS
 
 machine:

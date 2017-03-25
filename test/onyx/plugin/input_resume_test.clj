@@ -51,10 +51,10 @@
 
 (def batch-num (atom 0))
 
-(def test-state (atom []))
+(def test-state (atom #{}))
 
 (defn update-atom! [event window trigger {:keys [lower-bound upper-bound event-type] :as state-event} extent-state]
-  (reset! test-state extent-state))
+  (swap! test-state into extent-state))
 
 (def read-crash
   {:lifecycle/before-batch
