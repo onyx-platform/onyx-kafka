@@ -100,11 +100,12 @@
   [{:keys [onyx/min-peers onyx/max-peers onyx/n-peers kafka/partition] :as task-map} n-partitions]
   (let [fixed-partition? (and partition (or (= 1 n-peers)
                                             (= 1 max-peers)))
-        all-partitions-covered? (or (= n-partitions min-peers max-peers)
-                                    (= 1 n-partitions max-peers)
-                                    (= n-partitions n-peers))] 
-    (when-not (or fixed-partition? all-partitions-covered?)
-      (let [e (ex-info ":onyx/min-peers must equal :onyx/max-peers and the number of partitions, or :onyx/n-peers must equal number of kafka partitions" 
+        fixed-npeers? (or (= min-peers max-peers) (= 1 max-peers)
+                          (and n-peers (and (not min-peers) (not max-peers))))
+        n-peers (or max-peers n-peers)
+        n-peers-less-eq-n-partitions (<= n-peers n-partitions)] 
+    (when-not (or fixed-partition? fixed-npeers? n-peers-less-eq-n-partitions)
+      (let [e (ex-info ":onyx/min-peers must equal :onyx/max-peers, or :onyx/n-peers must be set, and :onyx/min-peers and :onyx/max-peers must not be set. Number of peers should also be less than or equal to the number of partitions."
                        {:n-partitions n-partitions 
                         :n-peers n-peers
                         :min-peers min-peers

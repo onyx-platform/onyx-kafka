@@ -35,7 +35,7 @@
                                        :kafka/zookeeper zk-address
                                        :kafka/offset-reset :earliest
                                        :kafka/deserializer-fn :onyx.tasks.kafka/deserialize-message-edn
-                                       :onyx/n-peers 2
+                                       :onyx/n-peers 1
                                        :onyx/batch-size 2}
                                       batch-settings)))
         (add-task (core-async/output :out batch-settings)))))
@@ -67,8 +67,8 @@
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
         {:keys [out read-messages]} (get-core-async-channels job)
-        test-data1 [{:n 1}]
-        test-data2 [{:n 2} {:n 3} {:n 4} {:n 5} {:n 6}]
+        test-data1 (mapv (fn [i] {:n i}) (range 0 100))
+        test-data2 (mapv (fn [i] {:n i}) (range 101 200))
         mock (atom {})
         _ (test-utils/create-topic zk-address test-topic 2)]
     (with-test-env [test-env [4 env-config peer-config]]
