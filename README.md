@@ -23,15 +23,9 @@ In your peer boot-up namespace:
 ##### read-messages
 
 Reads segments from a Kafka topic. Peers will automatically be assigned to each
-of the topics partitions, unless `:kafka/partition` is supplied in which case
-only one partition will be read from. `:onyx/min-peers` and `:onyx/max-peers`
-must be used to fix the number of the peers for the task to the number of
-partitions read by the task.
-
-NOTE: The `:done` sentinel (i.e. batch processing) is not supported if more
-than one partition is auto-assigned i.e. the topic has more than one partition
-and `:kafka/partition` is not fixed. An exception will be thrown if a `:done`
-is read under this circumstance.
+of the topics partitions, balancing the number of partitions over the number of
+peers, unless `:kafka/partition` is supplied in which case only one partition
+will be read from.
 
 Catalog entry:
 
@@ -48,8 +42,7 @@ Catalog entry:
  :kafka/wrap-with-metadata? false
  ;; :kafka/start-offsets {p1 offset1, p2, offset2}
  :onyx/batch-timeout 50
- :onyx/min-peers <<NUMBER-OF-PARTITIONS>>
- :onyx/max-peers <<NUMBER-OF-PARTITIONS>>
+ :onyx/n-peers << NUMBER OF PEERS TO READ PARTITIONS, UP TO N-PARTITION MAX >>
  :onyx/batch-size 100
  :onyx/doc "Reads messages from a Kafka topic"}
 ```
