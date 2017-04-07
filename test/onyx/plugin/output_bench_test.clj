@@ -1,6 +1,5 @@
 (ns onyx.plugin.output-bench-test
   (:require [clojure.core.async :refer [<!! go pipe >!! close!]]
-            [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as component]
             [franzy.admin.zookeeper.client :as k-admin]
