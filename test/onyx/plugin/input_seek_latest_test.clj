@@ -1,6 +1,5 @@
 (ns onyx.plugin.input-seek-latest-test
   (:require [clojure.core.async :refer [<!! go pipe]]
-            [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
             [franzy.admin.zookeeper.client :as k-admin]
