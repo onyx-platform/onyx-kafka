@@ -143,6 +143,7 @@
                                                             (:kafka/receive-buffer-bytes defaults))
                                   :auto.offset.reset (:kafka/offset-reset task-map)}
                                  consumer-opts)
+          _ (info log-prefix "Starting kafka/read-messages task with consumer opts:" consumer-config)
           key-deserializer (byte-array-deserializer)
           value-deserializer (byte-array-deserializer)
           consumer* (consumer/make-consumer consumer-config key-deserializer value-deserializer)
@@ -300,13 +301,14 @@
   (onCompletion [_ v exception]
     (reset! e exception)))
 
-(defn write-messages [{:keys [onyx.core/task-map] :as event}]
+(defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
         config (merge {:bootstrap.servers (vals (id->broker (:kafka/zookeeper task-map)))
                        :max.request.size request-size}
                       producer-opts)
+        _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
         topic (:kafka/topic task-map)
         key-serializer (byte-array-serializer)
         value-serializer (byte-array-serializer)
