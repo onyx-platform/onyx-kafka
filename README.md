@@ -59,7 +59,7 @@ Lifecycle entry:
 |key                          | type      | default | description
 |-----------------------------|-----------|---------|------------
 |`:kafka/topic`               | `string`  |         | The topic name to connect to
-|`:kafka/partition`           | `string`  |         | Optional: partition to read from if auto-assignment is not used
+|`:kafka/partition`           | `string`  |         | Optional: partition to read or write to from if auto-assignment is not used
 |`:kafka/zookeeper`           | `string`  |         | The ZooKeeper connection string
 |`:kafka/offset-reset`        | `keyword` |         | Offset bound to seek to when not found - `:earliest` or `:latest`
 |`:kafka/receive-buffer-bytes`| `integer` |`65536`  | The size in the receive buffer in the Kafka consumer.
