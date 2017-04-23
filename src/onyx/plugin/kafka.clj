@@ -232,11 +232,11 @@
   {})
 
 (defn- message->producer-record
-  [serializer-fn topic m]
+  [serializer-fn topic kpartition m]
   (let [message (:message m)
         k (some-> m :key serializer-fn)
-        p (some-> m :partition int)
-        message-topic (get m :topic topic)]
+        message-topic (get m :topic topic)
+        message-partition (some-> m (get :partition kpartition) int)]
     (cond (not (contains? m :message))
           (throw (ex-info "Payload is missing required. Need message key :message"
                           {:recoverable? false
@@ -249,14 +249,22 @@
                        "are missing!")
                   {:recoverable? false
                    :payload m}))
+
+          (nil? message-partition)
+          (throw (ex-info
+                  (str "Unable to write message payload to Kafka! "
+                       "Both :kafka/partition, and :partition in message payload "
+                       "are missing!")
+                  {:recoverable? false
+                   :payload m}))
           :else
-          (ProducerRecord. message-topic p k (serializer-fn message)))))
+          (ProducerRecord. message-topic message-partition k (serializer-fn message)))))
 
 (defn clear-write-futures! [write-futures]
   (vswap! write-futures 
           (fn [fs] (doall (remove realized? fs)))))
 
-(defrecord KafkaWriteMessages [task-map config topic producer serializer-fn write-futures exception write-callback]
+(defrecord KafkaWriteMessages [task-map config topic kpartition producer serializer-fn write-futures exception write-callback]
   p/Plugin
   (start [this event] 
     this)
@@ -289,7 +297,7 @@
                     (comp (mapcat :leaves)
                           (map (fn [msg]
                                  (send-async! producer 
-                                              (message->producer-record serializer-fn topic msg)
+                                              (message->producer-record serializer-fn topic kpartition msg)
                                               {:send-callback write-callback}))))
                     (:tree results))))
     true))
@@ -310,6 +318,7 @@
                       producer-opts)
         _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
         topic (:kafka/topic task-map)
+        kpartition (:kafka/partition task-map)
         key-serializer (byte-array-serializer)
         value-serializer (byte-array-serializer)
         producer (producer/make-producer config key-serializer value-serializer)
@@ -317,7 +326,7 @@
         exception (atom nil)
         write-callback (->ExceptionCallback exception)
         write-futures (volatile! (list))]
-    (->KafkaWriteMessages task-map config topic producer serializer-fn 
+    (->KafkaWriteMessages task-map config topic kpartition producer serializer-fn 
                           write-futures exception write-callback)))
 
 (defn read-handle-exception [event lifecycle lf-kw exception]
