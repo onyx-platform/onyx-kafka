@@ -250,13 +250,6 @@
                   {:recoverable? false
                    :payload m}))
 
-          (nil? message-partition)
-          (throw (ex-info
-                  (str "Unable to write message payload to Kafka! "
-                       "Both :kafka/partition, and :partition in message payload "
-                       "are missing!")
-                  {:recoverable? false
-                   :payload m}))
           :else
           (ProducerRecord. message-topic message-partition k (serializer-fn message)))))
 
