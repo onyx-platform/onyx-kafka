@@ -9,7 +9,7 @@ This plugin version is *only compatible with Kafka 0.9+*. Please use [onyx-kafka
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-kafka "0.10.0.0-SNAPSHOT"]
+[org.onyxplatform/onyx-kafka "0.10.0.1-SNAPSHOT"]
 ```
 
 In your peer boot-up namespace:
@@ -59,7 +59,7 @@ Lifecycle entry:
 |key                          | type      | default | description
 |-----------------------------|-----------|---------|------------
 |`:kafka/topic`               | `string`  |         | The topic name to connect to
-|`:kafka/partition`           | `string`  |         | Optional: partition to read from if auto-assignment is not used
+|`:kafka/partition`           | `string`  |         | Optional: partition to read or write to from if auto-assignment is not used
 |`:kafka/zookeeper`           | `string`  |         | The ZooKeeper connection string
 |`:kafka/offset-reset`        | `keyword` |         | Offset bound to seek to when not found - `:earliest` or `:latest`
 |`:kafka/receive-buffer-bytes`| `integer` |`65536`  | The size in the receive buffer in the Kafka consumer.
