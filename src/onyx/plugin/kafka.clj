@@ -212,6 +212,7 @@
                         :partition (.partition cr)
                         :key (.key cr)
                         :message (deserializer-fn (.value cr))
+                        :n-bytes (count (.value cr))
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))
