@@ -1,7 +1,6 @@
 #### 0.10.0.0-beta9
 * Kafka input plugin now supports reading from multiple partitions with a single peer.
 
-
 #### 0.10.0.0-beta2
 * Greatly improve kafka output performance.
 

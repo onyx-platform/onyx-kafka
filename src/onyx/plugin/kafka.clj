@@ -213,6 +213,7 @@
                         :key (.key cr)
                         :message (deserializer-fn (.value cr))
                         :n-bytes (count (.value cr))
+                        :timestamp (.timestamp cr)
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))
