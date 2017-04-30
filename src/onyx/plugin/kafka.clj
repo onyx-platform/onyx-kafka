@@ -212,6 +212,9 @@
                         :partition (.partition cr)
                         :key (.key cr)
                         :message (deserializer-fn (.value cr))
+                        :serialized-key-size (.serializedKeySize cr)
+                        :serialized-value-size (.serializedValueSize cr)
+                        :timestamp (.timestamp cr)
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))
