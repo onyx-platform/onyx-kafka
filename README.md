@@ -64,7 +64,7 @@ Lifecycle entry:
 |`:kafka/offset-reset`        | `keyword` |         | Offset bound to seek to when not found - `:earliest` or `:latest`
 |`:kafka/receive-buffer-bytes`| `integer` |`65536`  | The size in the receive buffer in the Kafka consumer.
 |`:kafka/deserializer-fn`     | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
-|`:kafka/wrap-with-metadata?` | `boolean` |`false`  | Wraps message into map with keys `:key, `:n-bytes`, `:offset`, `:timestamp`, `:partition`, `:topic` and `:message` itself
+|`:kafka/wrap-with-metadata?` | `boolean` |`false`  | Wraps message into map with keys `:key, `:serialized-key-size`, `:serialized-value-size`, `:offset`, `:timestamp`, `:partition`, `:topic` and `:message` itself
 |`:kafka/start-offsets`       | `map`     |         | Allows a task to be supplied with the starting offsets for all partitions. Maps partition to offset, e.g. `{0 50, 1, 90}` will start at offset 50 for partition 0, and offset 90 for partition 1
 |`:kafka/consumer-opts`       | `map`     |         | A map of arbitrary configuration to merge into the underlying Kafka consumer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#newconsumerconfigs). Please note that key values such as `fetch.min.bytes` must be in keyword form, i.e. `:fetch.min.bytes`.
 
