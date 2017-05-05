@@ -210,7 +210,7 @@
                      (fn [^ConsumerRecord cr]
                        {:topic (.topic cr)
                         :partition (.partition cr)
-                        :key (.key cr)
+                        :key (deserializer-fn (.key cr))
                         :message (deserializer-fn (.value cr))
                         :serialized-key-size (.serializedKeySize cr)
                         :serialized-value-size (.serializedValueSize cr)
