@@ -74,8 +74,13 @@
               :optional? true}
 
              :kafka/deserializer-fn
-             {:doc "A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument, which must be a byte array."
+             {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's value. Takes one argument, which must be a byte array."
               :type :keyword}
+
+             :kafka/key-deserializer-fn
+             {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's key. Takes one argument, which must be a byte array. Only used when `:kafka/wrap-with-metadata?` is true."
+              :type :keyword
+              :optional? true}
 
              :kafka/wrap-with-metadata?
              {:doc "Wraps message into map with keys `:offset`, `:partitions`, `:topic` and `:message` itself."
@@ -110,8 +115,13 @@
               :optional? true}
 
              :kafka/serializer-fn
-             {:doc "A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment."
+             {:doc "A keyword that represents a fully qualified namespaced function to serialize a record's value. Takes one argument - the segment."
               :type :keyword}
+
+             :kafka/key-serializer-fn
+             {:doc "A keyword that represents a fully qualified namespaced function to serialize a record's key. Takes one argument - the segment."
+              :type :keyword
+              :optional? true}
 
              :kafka/producer-opts
              {:doc "A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`."
@@ -144,6 +154,7 @@
      :kafka/offset-reset
      :kafka/force-reset?
      :kafka/deserializer-fn
+     :kafka/key-deserializer-fn
      :kafka/receive-buffer-bytes
      :kafka/commit-interval
      :kafka/wrap-with-metadata?
@@ -158,6 +169,7 @@
      :kafka/zookeeper
      :kafka/partition
      :kafka/serializer-fn
+     :kafka/key-serializer-fn
      :kafka/request-size
      :kafka/no-seal?
      :kafka/producer-opts]}})
