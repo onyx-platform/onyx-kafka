@@ -154,6 +154,7 @@
      :kafka/offset-reset
      :kafka/force-reset?
      :kafka/deserializer-fn
+     :kafka/key-deserializer-fn
      :kafka/receive-buffer-bytes
      :kafka/commit-interval
      :kafka/wrap-with-metadata?
@@ -168,6 +169,7 @@
      :kafka/zookeeper
      :kafka/partition
      :kafka/serializer-fn
+     :kafka/key-serializer-fn
      :kafka/request-size
      :kafka/no-seal?
      :kafka/producer-opts]}})
