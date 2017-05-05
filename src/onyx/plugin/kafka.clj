@@ -206,11 +206,12 @@
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
         deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
+        key-deserializer-fn (if-let [kw (:kafka/key-deserializer-fn task-map)] (kw->fn kw) identity)
         segment-fn (if wrap-message?
                      (fn [^ConsumerRecord cr]
                        {:topic (.topic cr)
                         :partition (.partition cr)
-                        :key (deserializer-fn (.key cr))
+                        :key (when-let [k (.key cr)] (key-deserializer-fn k))
                         :message (deserializer-fn (.value cr))
                         :serialized-key-size (.serializedKeySize cr)
                         :serialized-value-size (.serializedValueSize cr)
@@ -235,7 +236,7 @@
   {})
 
 (defn- message->producer-record
-  [serializer-fn topic kpartition m]
+  [key-serializer-fn serializer-fn topic kpartition m]
   (let [message (:message m)
         k (some-> m :key serializer-fn)
         message-topic (get m :topic topic)
@@ -260,7 +261,7 @@
   (vswap! write-futures 
           (fn [fs] (doall (remove realized? fs)))))
 
-(defrecord KafkaWriteMessages [task-map config topic kpartition producer serializer-fn write-futures exception write-callback]
+(defrecord KafkaWriteMessages [task-map config topic kpartition producer key-serializer-fn serializer-fn write-futures exception write-callback]
   p/Plugin
   (start [this event] 
     this)
@@ -293,7 +294,7 @@
                     (comp (mapcat :leaves)
                           (map (fn [msg]
                                  (send-async! producer 
-                                              (message->producer-record serializer-fn topic kpartition msg)
+                                              (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)
                                               {:send-callback write-callback}))))
                     (:tree results))))
     true))
@@ -319,10 +320,12 @@
         value-serializer (byte-array-serializer)
         producer (producer/make-producer config key-serializer value-serializer)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))
+        key-serializer-fn (if-let [kw (:kafka/key-serializer-fn task-map)] (kw->fn kw) identity)
         exception (atom nil)
         write-callback (->ExceptionCallback exception)
         write-futures (volatile! (list))]
-    (->KafkaWriteMessages task-map config topic kpartition producer serializer-fn 
+    (->KafkaWriteMessages task-map config topic kpartition producer
+                          key-serializer-fn serializer-fn
                           write-futures exception write-callback)))
 
 (defn read-handle-exception [event lifecycle lf-kw exception]

@@ -63,7 +63,8 @@ Lifecycle entry:
 |`:kafka/zookeeper`           | `string`  |         | The ZooKeeper connection string
 |`:kafka/offset-reset`        | `keyword` |         | Offset bound to seek to when not found - `:earliest` or `:latest`
 |`:kafka/receive-buffer-bytes`| `integer` |`65536`  | The size in the receive buffer in the Kafka consumer.
-|`:kafka/deserializer-fn`     | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a message. Takes one argument - a byte array
+|`:kafka/key-deserializer-fn` | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a record's key. Takes one argument - a byte array. Only used when `:kafka/wrap-with-metadata?` is true.
+|`:kafka/deserializer-fn`     | `keyword` |         | A keyword that represents a fully qualified namespaced function to deserialize a record's value. Takes one argument - a byte array
 |`:kafka/wrap-with-metadata?` | `boolean` |`false`  | Wraps message into map with keys `:key, `:serialized-key-size`, `:serialized-value-size`, `:offset`, `:timestamp`, `:partition`, `:topic` and `:message` itself
 |`:kafka/start-offsets`       | `map`     |         | Allows a task to be supplied with the starting offsets for all partitions. Maps partition to offset, e.g. `{0 50, 1, 90}` will start at offset 50 for partition 0, and offset 90 for partition 1
 |`:kafka/consumer-opts`       | `map`     |         | A map of arbitrary configuration to merge into the underlying Kafka consumer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#newconsumerconfigs). Please note that key values such as `fetch.min.bytes` must be in keyword form, i.e. `:fetch.min.bytes`.
@@ -111,7 +112,8 @@ key values.
 |----------------------------|-----------|---------|------------
 |`:kafka/topic`              | `string`  |         | The topic name to connect to
 |`:kafka/zookeeper`          | `string`  |         | The ZooKeeper connection string
-|`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a message. Takes one argument - the segment
+|`:kafka/key-serializer-fn`  | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a record's key. Takes one argument - the segment
+|`:kafka/serializer-fn`      | `keyword` |         | A keyword that represents a fully qualified namespaced function to serialize a record's value. Takes one argument - the segment
 |`:kafka/request-size`       | `number`  |`307200` | The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer.
 |`:kafka/no-seal?`           | `boolean` |`false`  | Do not write :done to the topic when task receives the sentinel signal (end of batch job)
 |`:kafka/producer-opts`      | `map`     |         | A map of arbitrary configuration to merge into the underlying Kafka producer base configuration. Map should contain keywords as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#producerconfigs). Please note that key values such as `buffer.memory` must be in keyword form, i.e. `:buffer.memory`.
