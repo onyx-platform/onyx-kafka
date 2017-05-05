@@ -22,6 +22,7 @@
    :kafka/zookeeper s/Str
    :kafka/offset-reset (s/enum :earliest :latest)
    :kafka/deserializer-fn os/NamespacedKeyword
+   (s/optional-key :kafka/key-deserializer-fn) os/NamespacedKeyword
    (s/optional-key :kafka/group-id) s/Str
    (s/optional-key :kafka/consumer-opts) {s/Any s/Any}
    (s/optional-key :kafka/start-offsets) {s/Int s/Int}
@@ -68,6 +69,7 @@
   {(s/optional-key :kafka/topic) s/Str
    :kafka/zookeeper s/Str
    :kafka/serializer-fn os/NamespacedKeyword
+   (s/optional-key :kafka/key-serializer-fn) os/NamespacedKeyword
    (s/optional-key :kafka/request-size) s/Num
    (s/optional-key :kafka/partition) (s/cond-pre s/Int s/Str)
    (s/optional-key :kafka/no-seal?) s/Bool

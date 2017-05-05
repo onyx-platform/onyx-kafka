@@ -36,11 +36,3 @@
    (let [c (make-consumer zk-addr)]
      (assign-partitions! c [{:topic topic :partition 0}])
      (mapv #(consumer-record->message decompress-fn %) (poll! c {:poll-timeout-ms timeout})))))
-
-; (defn take-segments
-;   "Reads segments from a topic until a :done is reached."
-;   ([zk-addr topic decompress-fn] (take-segments zk-addr topic decompress-fn {}))
-;   ([zk-addr topic decompress-fn opts]
-;    (conj (mapv :value
-;                (take-until-done zk-addr topic decompress-fn opts))
-;          :done)))
