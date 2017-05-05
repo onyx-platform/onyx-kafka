@@ -78,7 +78,7 @@
               :type :keyword}
 
              :kafka/key-deserializer-fn
-             {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's key. Takes one argument, which must be a byte array."
+             {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's key. Takes one argument, which must be a byte array. Only used when `:kafka/wrap-with-metadata?` is true."
               :type :keyword
               :optional? true}
 
