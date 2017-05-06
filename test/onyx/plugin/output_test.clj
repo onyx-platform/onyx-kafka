@@ -51,6 +51,7 @@
        (sort-by (comp :n :value))
        (map #(select-keys % [:key :partition :topic :value]))))
 
+
 (deftest kafka-output-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         other-test-topic (str "onyx-test-other-" (java.util.UUID/randomUUID))
