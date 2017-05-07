@@ -257,12 +257,11 @@
           :else
           (ProducerRecord. message-topic message-partition k (serializer-fn message)))))
 
-(defn clear-write-futures! [write-futures]
-  (vswap! write-futures 
-          (fn [fs] 
-            (when-not (empty? (filter #(.isCancelled ^java.util.concurrent.Future %) fs))
-              (throw (ex-info "Failed assertion: kafka writes cancelled. Rebooting." {})))
-            (doall (remove realized? fs)))))
+(defn clear-write-futures! [fs]
+  (doall (remove (fn [f] 
+                   (assert (not (.isCancelled ^java.util.concurrent.Future f)))
+                   (realized? f)) 
+                 fs)))
 
 (defrecord KafkaWriteMessages [task-map config topic kpartition producer key-serializer-fn serializer-fn write-futures exception write-callback]
   p/Plugin
@@ -276,11 +275,11 @@
   p/BarrierSynchronization
   (synced? [this epoch]
     (when @exception (throw @exception))
-    (empty? (clear-write-futures! write-futures)))
+    (empty? (vswap! write-futures clear-write-futures!)))
 
   (completed? [this]
     (when @exception (throw @exception))
-    (empty? (clear-write-futures! write-futures)))
+    (empty? (vswap! write-futures clear-write-futures!)))
 
   p/Checkpointed
   (recover! [this _ _] 
@@ -293,16 +292,16 @@
     true)
   (write-batch [this {:keys [onyx.core/results]} replica _]
     (when @exception (throw @exception))
-    (vswap! write-futures 
+    (vswap! write-futures
             (fn [fs]
-              (doall 
-               (into (remove realized? fs)
-                     (comp (mapcat :leaves)
-                           (map (fn [msg]
-                                  (send-async! producer 
-                                               (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)
-                                               {:send-callback write-callback}))))
-                     (:tree results)))))
+              (-> fs
+                  (clear-write-futures!)
+                  (into (comp (mapcat :leaves)
+                              (map (fn [msg]
+                                     (send-async! producer 
+                                                  (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)
+                                                  {:send-callback write-callback}))))
+                        (:tree results)))))
     true))
 
 (def write-defaults {:kafka/request-size 307200})
@@ -310,7 +309,7 @@
 (deftype ExceptionCallback [e]
   Callback
   (onCompletion [_ v exception]
-    (reset! e exception)))
+    (when exception (reset! e exception))))
 
 (defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
