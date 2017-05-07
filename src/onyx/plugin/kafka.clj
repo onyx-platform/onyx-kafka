@@ -259,7 +259,10 @@
 
 (defn clear-write-futures! [write-futures]
   (vswap! write-futures 
-          (fn [fs] (doall (remove realized? fs)))))
+          (fn [fs] 
+            (when-not (empty? (filter #(.isCancelled ^java.util.concurrent.Future %) fs))
+              (throw (ex-info "Failed assertion: kafka writes cancelled. Rebooting." {})))
+            (doall (remove realized? fs)))))
 
 (defrecord KafkaWriteMessages [task-map config topic kpartition producer key-serializer-fn serializer-fn write-futures exception write-callback]
   p/Plugin
@@ -272,9 +275,11 @@
 
   p/BarrierSynchronization
   (synced? [this epoch]
+    (when @exception (throw @exception))
     (empty? (clear-write-futures! write-futures)))
 
   (completed? [this]
+    (when @exception (throw @exception))
     (empty? (clear-write-futures! write-futures)))
 
   p/Checkpointed
@@ -290,13 +295,14 @@
     (when @exception (throw @exception))
     (vswap! write-futures 
             (fn [fs]
-              (into (doall (remove realized? fs))
-                    (comp (mapcat :leaves)
-                          (map (fn [msg]
-                                 (send-async! producer 
-                                              (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)
-                                              {:send-callback write-callback}))))
-                    (:tree results))))
+              (doall 
+               (into (remove realized? fs)
+                     (comp (mapcat :leaves)
+                           (map (fn [msg]
+                                  (send-async! producer 
+                                               (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)
+                                               {:send-callback write-callback}))))
+                     (:tree results)))))
     true))
 
 (def write-defaults {:kafka/request-size 307200})
