@@ -140,38 +140,6 @@ topic, this will hang forever as there is no timeout.
 
 ```
 
-#### Embedded Kafka Server
-
-An embedded Kafka server is included for use in test cases where jobs output to
-kafka output tasks. Note, stopping the server will *not* perform a [graceful shutdown](http://kafka.apache.org/documentation.html#basic_ops_restarting) -
-please do not use this embedded server for anything other than tests.
-
-This can be used like so:
-
-```clojure
-(ns your-ns.a-test
-  (:require [onyx.kafka.embedded-server :as ke]
-            [com.stuartsierra.component :as component]))
-
-(def kafka-server
-  (component/start
-    (ke/embedded-kafka {:advertised.host.name "127.0.0.1"
-                        :port 9092
-                        :embedded-kafka? embedded-kafka?
-                        :broker.id 0
-                        :zookeeper.connect "127.0.0.1:2188"
-                        :controlled.shutdown.enable false
-                        :num-partitions 1
-                        ; optional log dir name - randomized dir will be created if none is supplied
-                        ; :log-dir "/tmp/embedded-kafka"})))
-
-;; insert code to run a test here
-
-;; stop the embedded server
-(component/stop kafka-server)
-
-```
-
 #### Development
 
 To benchmark, start a real ZooKeeper instance (at 127.0.0.1:2181) and Kafka instance, and run the following benchmarks.

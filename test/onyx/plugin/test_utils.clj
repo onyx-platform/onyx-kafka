@@ -8,7 +8,6 @@
              [client :as producer]
              [protocols :refer [send-sync!]]]
             [franzy.serialization.serializers :refer [byte-array-serializer]]
-            [onyx.kafka.embedded-server :as ke]
             [schema.core :as s]
             [taoensso.timbre :as log])
   (:import franzy.clients.producer.types.ProducerRecord))
