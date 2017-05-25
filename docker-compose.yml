@@ -3,7 +3,7 @@ zookeeper:
   ports: 
     - "2181:2181"
 kafka:
-  image: wurstmeister/kafka:0.10.0.0
+  image: wurstmeister/kafka:0.10.1.1
   ports:
     - "9092:9092"
   links: 

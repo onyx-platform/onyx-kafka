@@ -6,7 +6,6 @@
             [franzy.admin.cluster :as k-cluster]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.embedded-server :as ke]
             [onyx.kafka.utils :refer [take-now]]
             [onyx.tasks.kafka :refer [producer]]
             [onyx.tasks.core-async :as core-async]

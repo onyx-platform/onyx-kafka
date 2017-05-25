@@ -13,7 +13,6 @@
             [taoensso.nippy :as nip]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.embedded-server :as ke]
             [onyx.kafka.utils]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
