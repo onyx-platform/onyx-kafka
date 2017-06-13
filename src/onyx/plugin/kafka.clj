@@ -182,7 +182,7 @@
     drained)
 
   p/Input
-  (poll! [this _]
+  (poll! [this _ _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             deserialized (some-> rec segment-fn)]
