@@ -182,7 +182,7 @@
     drained)
 
   p/Input
-  (poll! [this _]
+  (poll! [this _ _]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             deserialized (some-> rec segment-fn)]
@@ -238,7 +238,7 @@
 (defn- message->producer-record
   [key-serializer-fn serializer-fn topic kpartition m]
   (let [message (:message m)
-        k (some-> m :key serializer-fn)
+        k (some-> m :key key-serializer-fn)
         message-topic (get m :topic topic)
         message-partition (some-> m (get :partition kpartition) int)]
     (cond (not (contains? m :message))
