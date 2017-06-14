@@ -35,6 +35,7 @@
                                 (merge {:kafka/topic topic
                                         :kafka/zookeeper zk-address
                                         :kafka/serializer-fn :onyx.tasks.kafka/serialize-message-edn
+                                        :kafka/key-serializer-fn :onyx.tasks.kafka/serialize-message-edn
                                         :kafka/request-size 307200}
                                        batch-settings))))))
 
