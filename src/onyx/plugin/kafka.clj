@@ -182,7 +182,7 @@
     drained)
 
   p/Input
-  (poll! [this _ _]
+  (poll! [this _ remaining-ms]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             deserialized (some-> rec segment-fn)]
@@ -198,7 +198,7 @@
       (do (set! iter 
                 (.iterator ^ConsumerRecords 
                            (.poll ^Consumer (.consumer ^FranzConsumer consumer) 
-                                  batch-timeout)))
+                                  remaining-ms)))
           nil))))
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
