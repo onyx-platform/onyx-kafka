@@ -115,12 +115,12 @@
   (let [encoded (to-topic-partition topic-partition)]
     (.seek ^KafkaConsumer consumer encoded offset)))
 
-(defn seek-to-beginning! [consumer topic-partition]
-  (let [encoded (to-topic-partition topic-partition)]
+(defn seek-to-beginning! [consumer topic-partitions]
+  (let [encoded (map to-topic-partition topic-partitions)]
     (.seekToBeginning ^KafkaConsumer consumer encoded)))
 
-(defn seek-to-end! [consumer topic-partition]
-  (let [encoded (to-topic-partition topic-partition)]
+(defn seek-to-end! [consumer topic-partitions]
+  (let [encoded (map to-topic-partition topic-partitions)]
     (.seekToEnd ^KafkaConsumer consumer encoded)))
 
 (defn consumer-record->message
