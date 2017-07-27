@@ -1,17 +1,8 @@
 (ns onyx.plugin.kafka
-  (:require [franzy.admin.cluster :as k-cluster]
-            [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.serialization.serializers :refer [byte-array-serializer]]
-            [franzy.serialization.deserializers :refer [byte-array-deserializer]]
-            [franzy.clients.producer.client :as producer]
-            [franzy.clients.producer.protocols :refer [send-async! send-sync!]]
-            [franzy.clients.producer.types :refer [make-producer-record]]
-            [franzy.clients.consumer.client :as consumer]
-            [franzy.clients.producer.callbacks :refer [send-callback]]
-            [franzy.common.metadata.protocols :as metadata]
-            [franzy.clients.consumer.protocols :refer [seek-to-offset!] :as cp]
+  (:require [clojure.string :refer [join]]
             [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.plugin.partition-assignment :refer [partitions-for-slot]]
+            [onyx.kafka.helpers :as h]
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.plugin.protocols :as p]
@@ -23,10 +14,7 @@
            [org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord]
            [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer]
            [org.apache.kafka.common TopicPartition]
-           [org.apache.kafka.clients.producer Callback]
-           [franzy.clients.consumer.client FranzConsumer]
-           [franzy.clients.producer.client FranzProducer]
-           [franzy.clients.producer.types ProducerRecord]))
+           [org.apache.kafka.clients.producer Callback KafkaProducer ProducerRecord]))
 
 (def defaults
   {:kafka/receive-buffer-bytes 65536
@@ -41,7 +29,7 @@
       (cond (get checkpoint kpartition)
             (let [offset (get checkpoint kpartition)]
               (info log-prefix "Seeking to checkpointed offset at:" (inc offset))
-              (seek-to-offset! consumer {:topic topic :partition kpartition} (inc offset)))
+              (h/seek-to-offset! consumer {:topic topic :partition kpartition} (inc offset)))
 
             start-offsets
             (let [offset (get start-offsets kpartition)]
@@ -49,48 +37,34 @@
                 (throw (ex-info "Offset missing for existing partition when using :kafka/start-offsets"
                                 {:missing-partition kpartition
                                  :kafka/start-offsets start-offsets})))
-              (seek-to-offset! consumer {:topic topic :partition kpartition} offset))
+              (h/seek-to-offset! consumer {:topic topic :partition kpartition} offset))
 
             (= policy :earliest)
             (do
               (info log-prefix "Seeking to earliest offset on topic" {:topic topic :partition kpartition})
-              (cp/seek-to-beginning-offset! consumer [{:topic topic :partition kpartition}]))
+              (h/seek-to-beginning! consumer [{:topic topic :partition kpartition}]))
 
             (= policy :latest)
             (do
               (info log-prefix "Seeking to latest offset on topic" {:topic topic :partition kpartition})
-              (cp/seek-to-end-offset! consumer [{:topic topic :partition kpartition}]))
+              (h/seek-to-end! consumer [{:topic topic :partition kpartition}]))
 
             :else
             (throw (ex-info "Tried to seek to unknown policy" {:recoverable? false
                                                                :policy policy}))))))
 
-;; kafka operations
-(defn id->broker [zk-addr]
-  (with-open [zk-utils (k-admin/make-zk-utils {:servers zk-addr} false)]
-    (reduce
-     (fn [result {:keys [id endpoints]}]
-       (assoc
-        result
-        id
-        (str (get-in endpoints [:plaintext :host])
-             ":"
-             (get-in endpoints [:plaintext :port]))))
-     {}
-     (k-cluster/all-brokers zk-utils))))
-
 (defn find-brokers [task-map]
   (let [zk-addr (:kafka/zookeeper task-map)
-        results (vals (id->broker zk-addr))]
+        results (vals (h/id->broker zk-addr))]
     (if (seq results)
       results
       (do
-       (info "Could not locate any Kafka brokers to connect to. Backing off.")
-       (Thread/sleep (or (:kafka/unable-to-find-broker-backoff-ms task-map) 
-                         (:kafka/unable-to-find-broker-backoff-ms defaults)))
-       (throw (ex-info "Could not locate any Kafka brokers to connect to."
-                       {:recoverable? true
-                        :zk-addr zk-addr}))))))
+        (info "Could not locate any Kafka brokers to connect to. Backing off.")
+        (Thread/sleep (or (:kafka/unable-to-find-broker-backoff-ms task-map) 
+                          (:kafka/unable-to-find-broker-backoff-ms defaults)))
+        (throw (ex-info "Could not locate any Kafka brokers to connect to."
+                        {:recoverable? true
+                         :zk-addr zk-addr}))))))
 
 (defn start-kafka-consumer
   [event lifecycle]
@@ -118,36 +92,36 @@
 (defn assign-partitions-to-slot! [consumer* task-map topic n-partitions slot]
   (if-let [part (:partition task-map)]
     (let [p (Integer/parseInt part)]
-      (cp/assign-partitions! consumer* [{:topic topic :partition p}])
+      (h/assign-partitions! consumer* [{:topic topic :partition p}])
       [p])
     (let [n-slots (or (:onyx/n-peers task-map) (:onyx/max-peers task-map))
           [lower upper] (partitions-for-slot n-partitions n-slots slot)
           parts-range (range lower (inc upper))
           parts (map (fn [p] {:topic topic :partition p}) parts-range)]
-      (cp/assign-partitions! consumer* parts)
+      (h/assign-partitions! consumer* parts)
       parts-range)))
 
 (deftype KafkaReadMessages 
-  [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
-   deserializer-fn segment-fn read-offset ^:unsynchronized-mutable consumer 
-   ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained]
+    [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
+     deserializer-fn segment-fn read-offset ^:unsynchronized-mutable consumer 
+     ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
     (let [{:keys [kafka/group-id kafka/consumer-opts]} task-map
           brokers (find-brokers task-map)
           _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
-          consumer-config (merge {:bootstrap.servers brokers
-                                  :group.id (or group-id "onyx")
-                                  :enable.auto.commit false
-                                  :receive.buffer.bytes (or (:kafka/receive-buffer-bytes task-map)
-                                                            (:kafka/receive-buffer-bytes defaults))
-                                  :auto.offset.reset (:kafka/offset-reset task-map)}
+          consumer-config (merge {"bootstrap.servers" brokers
+                                  "group.id" (or group-id "onyx")
+                                  "enable.auto.commit" false
+                                  "receive.buffer.bytes" (or (:kafka/receive-buffer-bytes task-map)
+                                                             (:kafka/receive-buffer-bytes defaults))
+                                  "auto.offset.reset" (:kafka/offset-reset task-map)}
                                  consumer-opts)
           _ (info log-prefix "Starting kafka/read-messages task with consumer opts:" consumer-config)
-          key-deserializer (byte-array-deserializer)
-          value-deserializer (byte-array-deserializer)
-          consumer* (consumer/make-consumer consumer-config key-deserializer value-deserializer)
-          partitions (mapv :partition (metadata/partitions-for consumer* topic))
+          key-deserializer (h/byte-array-deserializer)
+          value-deserializer (h/byte-array-deserializer)
+          consumer* (h/build-consumer consumer-config key-deserializer value-deserializer)
+          partitions (mapv :partition (h/partitions-for-topic consumer* topic))
           n-partitions (count partitions)]
       (check-num-peers-equals-partitions task-map n-partitions)
       (let [kpartitions* (assign-partitions-to-slot! consumer* task-map topic n-partitions (:onyx.core/slot-id event))]
@@ -157,7 +131,7 @@
 
   (stop [this event] 
     (when consumer 
-      (.close ^FranzConsumer consumer)
+      (.close ^KafkaConsumer consumer)
       (set! consumer nil))
     this)
 
@@ -195,10 +169,7 @@
                 (.set ^AtomicLong read-offset new-offset)
                 (set! partition->offset (assoc partition->offset part new-offset))
                 deserialized)))
-      (do (set! iter 
-                (.iterator ^ConsumerRecords 
-                           (.poll ^Consumer (.consumer ^FranzConsumer consumer) 
-                                  remaining-ms)))
+      (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
           nil))))
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
@@ -269,7 +240,7 @@
     this)
 
   (stop [this event] 
-    (.close ^FranzProducer producer)
+    (.close ^KafkaProducer producer)
     this)
 
   p/BarrierSynchronization
@@ -284,12 +255,15 @@
   p/Checkpointed
   (recover! [this _ _] 
     this)
+
   (checkpoint [this])
+
   (checkpointed! [this epoch])
 
   p/Output
   (prepare-batch [this event replica _]
     true)
+
   (write-batch [this {:keys [onyx.core/results]} replica _]
     (when @exception (throw @exception))
     (vswap! write-futures
@@ -297,10 +271,10 @@
               (-> fs
                   (clear-write-futures!)
                   (into (comp (mapcat :leaves)
-                              (map (fn [msg]
-                                     (send-async! producer 
-                                                  (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)
-                                                  {:send-callback write-callback}))))
+                              (map
+                               (fn [msg]
+                                 (let [record (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)]
+                                   (.send ^KafkaProducer producer record write-callback)))))
                         (:tree results)))))
     true))
 
@@ -315,15 +289,15 @@
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
-        config (merge {:bootstrap.servers (vals (id->broker (:kafka/zookeeper task-map)))
-                       :max.request.size request-size}
+        config (merge {"bootstrap.servers" (join "," (vals (h/id->broker (:kafka/zookeeper task-map))))
+                       "max.request.size" request-size}
                       producer-opts)
         _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
         topic (:kafka/topic task-map)
         kpartition (:kafka/partition task-map)
-        key-serializer (byte-array-serializer)
-        value-serializer (byte-array-serializer)
-        producer (producer/make-producer config key-serializer value-serializer)
+        key-serializer (h/byte-array-serializer)
+        value-serializer (h/byte-array-serializer)
+        producer (h/build-producer config key-serializer value-serializer)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))
         key-serializer-fn (if-let [kw (:kafka/key-serializer-fn task-map)] (kw->fn kw) identity)
         exception (atom nil)
