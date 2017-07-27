@@ -65,6 +65,7 @@
                    {:message {:n 3} :topic other-test-topic}]]
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
+        (test-utils/create-topic zk-address test-topic)
         (test-utils/create-topic zk-address other-test-topic)
         (run! #(>!! in %) test-data)
         (close! in)

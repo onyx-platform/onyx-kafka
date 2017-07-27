@@ -1,6 +1,5 @@
 (ns onyx.plugin.kafka
-  (:require [clojure.string :refer [join]]
-            [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
+  (:require [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
             [onyx.plugin.partition-assignment :refer [partitions-for-slot]]
             [onyx.kafka.helpers :as h]
             [taoensso.timbre :as log :refer [fatal info]]
@@ -289,7 +288,7 @@
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
-        config (merge {"bootstrap.servers" (join "," (vals (h/id->broker (:kafka/zookeeper task-map))))
+        config (merge {"bootstrap.servers" (vals (h/id->broker (:kafka/zookeeper task-map)))
                        "max.request.size" request-size}
                       producer-opts)
         _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
