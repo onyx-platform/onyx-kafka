@@ -40,8 +40,8 @@
 
 (defn write-data
   [topic zookeeper]
-  (test-utils/create-topic zookeeper topic)
-  (let [producer-config {"bootstrap.servers" ["127.0.0.1:9092"]}
+  (test-utils/create-topic zookeeper topic n-partitions)
+  (let [producer-config {"bootstrap.servers" ["192.168.99.100:9092"]}
         key-serializer (h/byte-array-serializer)
         value-serializer (h/byte-array-serializer)]
     (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]

@@ -19,10 +19,19 @@
    :operation-retry-timeout (long -1)
    :serializer (ZKStringSerializer$/MODULE$)})
 
+(defn munge-servers [servers]
+  (if (coll? servers)
+    (string/join "," servers)
+    servers))
+
 (defn as-properties ^Properties [m]
   (let [ps (Properties.)]
-    (doseq [[k v] m] (.setProperty ps k v))
+    (doseq [[k v] m] (.setProperty ps k (str v)))
     ps))
+
+(defn as-java [opts]
+  (cond-> opts
+    (get opts "bootstrap.servers") (update "bootstrap.servers" munge-servers)))
 
 (defn make-zk-connection [zk-config]
   (let [{:keys [servers session-timeout]} zk-config
@@ -56,8 +65,8 @@
             (fn [endpoint]
               {:host (.host endpoint)
                :port (.port endpoint)
-               :protocol-type (.name (.protocolType endpoint))})
-            (vals (JavaConversions/mapAsJavaMap (.endPoints broker))))}))))
+               :protocol-type (.name (.securityProtocol endpoint))})
+            (JavaConversions/seqAsJavaList (.endPoints broker)))}))))
 
 (defn id->broker [zk-addr]
   (with-open [zk-utils (make-zk-utils {:servers zk-addr} false)]
@@ -77,12 +86,12 @@
   (ByteArrayDeserializer.))
 
 (defn ^KafkaProducer build-producer [producer-opts key-serializer value-serializer]
-  (KafkaProducer. ^Properties (as-properties producer-opts)
+  (KafkaProducer. ^Properties (as-properties (as-java producer-opts))
                   ^Serializer key-serializer
                   ^Serializer value-serializer))
 
 (defn ^KafkaConsumer build-consumer [consumer-opts key-deserializer value-deserializer]
-  (KafkaConsumer. ^Properties (as-properties consumer-opts)
+  (KafkaConsumer. ^Properties (as-properties (as-java consumer-opts))
                   ^Deserializer key-deserializer
                   ^Deserializer value-deserializer))
 
@@ -135,7 +144,7 @@
      (assign-partitions! c [{:topic topic :partition 0}])
      (mapv #(consumer-record->message decompress-fn %) (poll! c timeout)))))
 
-(defn create-topic! [zk-addr topic-name properties num-partitions replication-factor]
+(defn create-topic! [zk-addr topic-name num-partitions replication-factor]
   (with-open [zk-utils (make-zk-utils {:servers zk-addr} false)]
     (AdminUtils/createTopic
      zk-utils topic-name num-partitions replication-factor (as-properties {})

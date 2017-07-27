@@ -115,7 +115,7 @@
                                   "enable.auto.commit" false
                                   "receive.buffer.bytes" (or (:kafka/receive-buffer-bytes task-map)
                                                              (:kafka/receive-buffer-bytes defaults))
-                                  "auto.offset.reset" (:kafka/offset-reset task-map)}
+                                  "auto.offset.reset" (name (:kafka/offset-reset task-map))}
                                  consumer-opts)
           _ (info log-prefix "Starting kafka/read-messages task with consumer opts:" consumer-config)
           key-deserializer (h/byte-array-deserializer)
