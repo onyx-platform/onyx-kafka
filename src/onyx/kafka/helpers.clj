@@ -3,9 +3,10 @@
             [taoensso.timbre :as log])
   (:import [kafka.utils ZkUtils]
            [org.apache.kafka.clients.consumer KafkaConsumer]
-           [org.apache.kafka.clients.producer KafkaProducer]
+           [org.apache.kafka.clients.producer KafkaProducer Callback ProducerRecord]
            [org.apache.kafka.common.serialization ByteArrayDeserializer ByteArraySerializer Serializer Deserializer]
            [org.apache.kafka.common TopicPartition]
+           [kafka.admin AdminUtils]
            [kafka.utils ZKStringSerializer$]
            [org.I0Itec.zkclient ZkClient ZkConnection IZkConnection]
            [org.I0Itec.zkclient.serialize ZkSerializer]
@@ -133,3 +134,20 @@
    (let [c (build-consumer zk-addr (byte-array-deserializer) (byte-array-deserializer))]
      (assign-partitions! c [{:topic topic :partition 0}])
      (mapv #(consumer-record->message decompress-fn %) (poll! c timeout)))))
+
+(defn create-topic! [zk-addr topic-name properties num-partitions replication-factor]
+  (with-open [zk-utils (make-zk-utils {:servers zk-addr} false)]
+    (AdminUtils/createTopic
+     zk-utils topic-name num-partitions replication-factor (as-properties {})
+     (kafka.admin.RackAwareMode$Safe$.))))
+
+(deftype ProducerCallback [p]
+  Callback
+  (onCompletion [_ v exception]
+    (deliver p true)))
+
+(defn send-sync! [producer topic part k v]
+  (let [p (promise)
+        record (ProducerRecord. topic part k v)]
+    (.send producer record (->ProducerCallback p))
+    @p))

@@ -2,24 +2,16 @@
   (:require [clojure.core.async :refer [<!! go pipe]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.cluster :as k-cluster]
-            [franzy.admin.topics :as k-topics]
-            [franzy.serialization.serializers :refer [byte-array-serializer]]
-            [franzy.serialization.deserializers :refer [byte-array-deserializer]]
-            [franzy.clients.producer.client :as producer]
-            [franzy.clients.producer.protocols :refer [send-sync!]]
             [aero.core :refer [read-config]]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.utils]
+            [onyx.kafka.helpers :as h]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
             [onyx.plugin.test-utils :as test-utils]
             [onyx.plugin.kafka]
-            [onyx.api])
-  (:import [franzy.clients.producer.types ProducerRecord]))
+            [onyx.api]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -51,14 +43,14 @@
   because we need to spawn 2 producers in order to write to each partition"
   [topic zookeeper]
   (let [producer-config {:bootstrap.servers ["127.0.0.1:9092"]}
-        key-serializer (byte-array-serializer)
-        value-serializer (byte-array-serializer)]
-    (with-open [producer1 (producer/make-producer producer-config key-serializer value-serializer)]
-      (with-open [producer2 (producer/make-producer producer-config key-serializer value-serializer)]
+        key-serializer (h/byte-array-serializer)
+        value-serializer (h/byte-array-serializer)]
+    (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
+      (with-open [producer2 (h/build-producer producer-config key-serializer value-serializer)]
         (doseq [x (range 3)] ;0 1 2
-          (send-sync! producer1 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n x})))))
+          (h/send-sync! producer1 topic nil nil (.getBytes (pr-str {:n x}))))
         (doseq [x (range 3)] ;3 4 5
-          (send-sync! producer2 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n (+ 3 x)})))))))))
+          (h/send-sync! producer2 topic nil nil (.getBytes (pr-str {:n (+ 3 x)}))))))))
 
 (deftest kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))

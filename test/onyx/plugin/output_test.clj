@@ -2,11 +2,9 @@
   (:require [clojure.core.async :refer [<!! go pipe close! >!!]]
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as component]
-            [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.cluster :as k-cluster]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.utils :refer [take-now]]
+            [onyx.kafka.helpers :as h]
             [onyx.tasks.kafka :refer [producer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
@@ -51,7 +49,6 @@
        (sort-by (comp :n :value))
        (map #(select-keys % [:key :partition :topic :value]))))
 
-
 (deftest kafka-output-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         other-test-topic (str "onyx-test-other-" (java.util.UUID/randomUUID))
@@ -77,7 +74,7 @@
         (testing "routing to default topic"
           (log/info "Waiting on messages in" test-topic)
           (let [msgs (prepare-messages
-                      (take-now zk-address test-topic decompress))]
+                      (h/take-now zk-address test-topic decompress))]
             (is (= [test-topic] (->> msgs (map :topic) distinct)))
             (is (= [{:key 1 :value {:n 0} :partition 0}
                     {:key nil :value {:n 1} :partition 0}
@@ -87,4 +84,4 @@
           (log/info "Waiting on messages in" other-test-topic)
           (is (= [{:key nil :value {:n 3} :partition 0 :topic other-test-topic}]
                  (prepare-messages
-                  (take-now zk-address other-test-topic decompress))))))))
+                  (h/take-now zk-address other-test-topic decompress))))))))

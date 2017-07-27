@@ -1,16 +1,10 @@
 (ns onyx.plugin.test-utils
   (:require [clojure.core.async :refer [<! go-loop]]
             [com.stuartsierra.component :as component]
-            [franzy.admin.topics :as k-topics]
-            [franzy.admin.zookeeper.client :as k-admin]
+            [onyx.kafka.helpers :as h]
             [aero.core]
-            [franzy.clients.producer
-             [client :as producer]
-             [protocols :refer [send-sync!]]]
-            [franzy.serialization.serializers :refer [byte-array-serializer]]
             [schema.core :as s]
-            [taoensso.timbre :as log])
-  (:import franzy.clients.producer.types.ProducerRecord))
+            [taoensso.timbre :as log]))
 
 (defn read-config []
   (aero.core/read-config (clojure.java.io/resource "config.edn") 
@@ -25,34 +19,27 @@
 (s/defn create-topic
   ([zk-address topic-name] (create-topic zk-address topic-name 1))
   ([zk-address :- s/Str topic-name :- s/Str partitions :- s/Int]
-   (println "CREATINGTOPIC")
    (log/info {:msg "Creating new topic"
               :zk-address zk-address
               :topic-name topic-name
               :partitions partitions})
-   (k-topics/create-topic!
-    (k-admin/make-zk-utils {:servers [zk-address]} false)
-    topic-name
-    partitions
-    ;; Replication factor needs to be set because we're only running a single
-    ;; embedded Kafka server.
-    1)))
+   (h/create-topic! zk-address topic-name partitions 1)))
 
 (defn write-data
   "Starts a Kafka in-memory instance, preloading a topic with xs.
    If xs is a channel, will load the topic with items off the channel."
   ([topic zookeeper xs]
-   (let [config {:bootstrap.servers ["127.0.0.1:9092"]}
-         key-serializer (byte-array-serializer)
-         value-serializer (byte-array-serializer)
-         prod (producer/make-producer config key-serializer value-serializer)]
+   (let [config {"bootstrap.servers" ["127.0.0.1:9092"]}
+         key-serializer (h/byte-array-serializer)
+         value-serializer (h/byte-array-serializer)
+         prod (h/build-producer config key-serializer value-serializer)]
      (if (sequential? xs)
-       (do (doseq [x xs]
-             (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str x)))))
-           (.close prod))
+       (do
+         (doseq [x xs]
+           (h/send-sync! prod topic 0 nil (.getBytes (pr-str x))))
+         (.close prod))
        (go-loop [itm (<! xs)]
-                (if itm
-                  (do
-                   (send-sync! prod (ProducerRecord. topic 0 nil (.getBytes (pr-str itm))))
-                   (recur (<! xs)))
-                  (.close prod)))))))
+         (if itm
+           (do (h/send-sync! prod topic 0 nil (.getBytes (pr-str itm)))
+               (recur (<! xs)))
+           (.close prod)))))))

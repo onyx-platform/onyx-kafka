@@ -2,26 +2,18 @@
   (:require [clojure.core.async :refer [<!! go pipe timeout chan alts!!]]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.cluster :as k-cluster]
-            [franzy.admin.topics :as k-topics]
-            [franzy.serialization.serializers :refer [byte-array-serializer]]
-            [franzy.serialization.deserializers :refer [byte-array-deserializer]]
-            [franzy.clients.producer.client :as producer]
-            [franzy.clients.producer.protocols :refer [send-async!]]
             [aero.core :refer [read-config]]
             [taoensso.nippy :as nip]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.utils]
+            [onyx.kafka.helpers :as h]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
             [onyx.plugin.test-utils :as test-utils]
             [onyx.plugin.kafka]
             [onyx.api])
-  (:import [franzy.clients.producer.types ProducerRecord]))
-
+  (:import [org.apache.kafka.clients.producer KafkaProducer Callback ProducerRecord]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -45,11 +37,7 @@
 (def n-partitions 1)
 
 (defn print-message [segment]
-  segment
-  ; (if (zero? (mod (:n segment) 10))
-  ;   segment
-  ;   [])
-  )
+  segment)
 
 (defn ignore-some-messages [segment]
   (even? (:n segment)))
@@ -85,20 +73,20 @@
 
 (defn write-data
   [topic zookeeper]
-  (let [zk-utils (k-admin/make-zk-utils {:servers [zookeeper]} false)
-        _ (k-topics/create-topic! zk-utils topic n-partitions)
-
-        producer-config {:bootstrap.servers ["127.0.0.1:9092"]}
-        key-serializer (byte-array-serializer)
-        value-serializer (byte-array-serializer)
-        producer1 (producer/make-producer producer-config key-serializer value-serializer)]
+  (h/create-topic! zookeeper topic)
+  (let [producer-config {"bootstrap.servers" ["127.0.0.1:9092"]}
+        key-serializer (h/byte-array-serializer)
+        value-serializer (h/byte-array-serializer)
+        producer1 (h/build-producer producer-config key-serializer value-serializer)]
     (time 
      (doseq [p (range n-partitions)]
        (mapv deref 
-             (doall (map (fn [x]
-                           ;; 116 bytes messages
-                           (send-async! producer1 (ProducerRecord. topic p nil (compress {:n x :really-long-string (apply str (repeatedly 30 (fn [] (rand-int 500))))})))) 
-                         (range messages-per-partition))))))
+             (doall
+              (map (fn [x]
+                     ;; 116 bytes messages
+                     (.send producer1 (ProducerRecord. topic p nil
+                                                       (compress {:n x :really-long-string (apply str (repeatedly 30 (fn [] (rand-int 500))))})))) 
+                   (range messages-per-partition))))))
     (println "Successfully wrote messages")))
 
 (defn take-until-nothing!
