@@ -225,12 +225,13 @@
                    :payload m}))
 
           :else
-          (ProducerRecord. message-topic message-partition k (serializer-fn message)))))
+          (do (prn message-topic "--> " message-partition)
+              (ProducerRecord. message-topic message-partition k (serializer-fn message))))))
 
 (defn clear-write-futures! [fs]
   (doall (remove (fn [f] 
                    (assert (not (.isCancelled ^java.util.concurrent.Future f)))
-                   (realized? f)) 
+                   (.isDone f)) 
                  fs)))
 
 (defrecord KafkaWriteMessages [task-map config topic kpartition producer key-serializer-fn serializer-fn write-futures exception write-callback]

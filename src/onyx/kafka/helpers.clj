@@ -140,7 +140,7 @@
    (take-now zk-addr topic decompress-fn 5000))
   ([zk-addr topic decompress-fn timeout]
    (log/info {:msg "Taking now..." :topic topic})
-   (let [c (build-consumer zk-addr (byte-array-deserializer) (byte-array-deserializer))]
+   (let [c (build-consumer {"bootstrap.servers" zk-addr} (byte-array-deserializer) (byte-array-deserializer))]
      (assign-partitions! c [{:topic topic :partition 0}])
      (mapv #(consumer-record->message decompress-fn %) (poll! c timeout)))))
 
