@@ -39,9 +39,9 @@
         (add-task (core-async/output :out batch-settings)))))
 
 (defn write-data
-  [topic zookeeper]
-  (test-utils/create-topic zookeeper topic n-partitions)
-  (let [producer-config {"bootstrap.servers" ["192.168.99.100:9092"]}
+  [topic zookeeper bootstrap-servers]
+  (h/create-topic! zookeeper topic n-partitions 1)
+  (let [producer-config {"bootstrap.servers" bootstrap-servers}
         key-serializer (h/byte-array-serializer)
         value-serializer (h/byte-array-serializer)]
     (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
@@ -63,10 +63,8 @@
         {:keys [out read-messages]} (get-core-async-channels job)]
       (with-test-env [test-env [(+ n-partitions 2) env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (write-data test-topic zk-address)
+        (write-data test-topic zk-address (:kafka-bootstrap test-config))
         (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
-          (println "Taking segments")
-          ;(onyx.test-helper/feedback-exception! peer-config job-id)
           (let [results (onyx.plugin.core-async/take-segments! out 10000)] 
             (println "RESULTS" results)
             (is (= 15 (reduce + (mapv :n results)))))

@@ -41,8 +41,8 @@
 (defn write-messages
   "Use a custom version of mock-kafka as opposed to the one in test-utils
   because we need to spawn 2 producers in order to write to each partition"
-  [topic zookeeper]
-  (let [producer-config {:bootstrap.servers ["127.0.0.1:9092"]}
+  [topic zookeeper bootstrap-servers]
+  (let [producer-config {"bootstrap.servers" bootstrap-servers}
         key-serializer (h/byte-array-serializer)
         value-serializer (h/byte-array-serializer)]
     (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
@@ -55,8 +55,8 @@
 (deftest kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
-        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
-                                                      {:profile :test})
+        {:keys [env-config test-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
+                                                                  {:profile :test})
         tenancy-id (str (java.util.UUID/randomUUID))
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
@@ -65,11 +65,11 @@
         {:keys [out read-messages]} (get-core-async-channels job)]
     (with-test-env [test-env [4 env-config peer-config]]
       (onyx.test-helper/validate-enough-peers! test-env job)
-      (test-utils/create-topic zk-address test-topic 2)
-      (write-messages test-topic zk-address)
+      (h/create-topic! zk-address test-topic 2 1)
+      (write-messages test-topic zk-address (:kafka-bootstrap test-config))
       (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
         (Thread/sleep 2000)
-        (write-messages test-topic zk-address)
+        (write-messages test-topic zk-address (:kafka-bootstrap test-config))
         (is (= 15 (reduce + (mapv :n (onyx.plugin.core-async/take-segments! out 10000)))))
         (onyx.api/kill-job peer-config job-id)
         (Thread/sleep 10000)))))

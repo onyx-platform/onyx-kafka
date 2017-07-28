@@ -108,7 +108,7 @@
 
 (defn assign-partitions! [consumer topic-partitions]
   (->> topic-partitions
-       (map to-topic-partition)
+       (mapv to-topic-partition)
        (.assign ^KafkaConsumer consumer)))
 
 (defn seek-to-offset! [consumer topic-partition offset]
@@ -125,10 +125,10 @@
 
 (defn consumer-record->message
   [decompress-fn m]
-  {:key (some-> m :key decompress-fn)
-   :partition (:partition m)
-   :topic (:topic m)
-   :value (-> m :value decompress-fn)})
+  {:key (some-> m (.key) decompress-fn)
+   :partition (.partition m)
+   :topic (.topic m)
+   :value (-> m (.value) decompress-fn)})
 
 (defn poll! [consumer timeout]
   (.poll ^KafkaConsumer consumer timeout))
@@ -136,12 +136,14 @@
 (defn take-now
   "Reads whatever it can from a topic on the assumption that we've distributed
   work across multiple topics and another topic contained :done."
-  ([zk-addr topic decompress-fn]
-   (take-now zk-addr topic decompress-fn 5000))
-  ([zk-addr topic decompress-fn timeout]
+  ([bootstrap-servers topic decompress-fn]
+   (take-now bootstrap-servers topic decompress-fn 5000))
+  ([bootstrap-servers topic decompress-fn timeout]
    (log/info {:msg "Taking now..." :topic topic})
-   (let [c (build-consumer {"bootstrap.servers" zk-addr} (byte-array-deserializer) (byte-array-deserializer))]
-     (assign-partitions! c [{:topic topic :partition 0}])
+   (let [c (build-consumer {"bootstrap.servers" bootstrap-servers} (byte-array-deserializer) (byte-array-deserializer))
+         topic-partitions [{:topic topic :partition 0}]]
+     (assign-partitions! c topic-partitions)
+     (seek-to-beginning! c topic-partitions)
      (mapv #(consumer-record->message decompress-fn %) (poll! c timeout)))))
 
 (defn create-topic! [zk-addr topic-name num-partitions replication-factor]

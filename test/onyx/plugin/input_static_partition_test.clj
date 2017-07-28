@@ -50,7 +50,7 @@
         test-data [{:n 1} {:n 2} {:n 3} :done]]
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (test-utils/write-data test-topic zk-address test-data)
+        (test-utils/write-data test-topic zk-address (:kafka-bootstrap test-config) test-data)
         (->> (onyx.api/submit-job peer-config job)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))

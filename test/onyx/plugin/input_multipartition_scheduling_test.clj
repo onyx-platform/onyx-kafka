@@ -38,9 +38,9 @@
         (add-task (core-async/output :out batch-settings)))))
 
 (defn write-data
-  [topic zookeeper n-segments-each]
-  (h/create-topic! zookeeper topic)
-  (let [producer-config {"bootstrap.servers" ["127.0.0.1:9092"]}
+  [topic zookeeper kafka-bootstrap n-segments-each]
+  (h/create-topic! zookeeper topic n-partitions 1)
+  (let [producer-config {"bootstrap.servers" kafka-bootstrap}
         key-serializer (h/byte-array-serializer)
         value-serializer (h/byte-array-serializer)]
     (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
@@ -54,6 +54,7 @@
   (let [test-topic (str (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
+        kafka-bootstrap (:kafka-bootstrap test-config)
         tenancy-id (str (java.util.UUID/randomUUID)) 
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
@@ -67,7 +68,7 @@
         n-segments-each 200]
       (with-test-env [test-env [(+ n-partitions 2) env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (write-data test-topic zk-address n-segments-each)
+        (write-data test-topic zk-address kafka-bootstrap n-segments-each)
         (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
           (println "Taking segments")
           ;(onyx.test-helper/feedback-exception! peer-config job-id)

@@ -72,9 +72,9 @@
                                      100000000)))))
 
 (defn write-data
-  [topic zookeeper]
-  (h/create-topic! zookeeper topic)
-  (let [producer-config {"bootstrap.servers" ["127.0.0.1:9092"]}
+  [topic zookeeper bootstrap-servers]
+  (h/create-topic! zookeeper topic n-partitions 1)
+  (let [producer-config {"bootstrap.servers" bootstrap-servers}
         key-serializer (h/byte-array-serializer)
         value-serializer (h/byte-array-serializer)
         producer1 (h/build-producer producer-config key-serializer value-serializer)]
@@ -84,7 +84,9 @@
              (doall
               (map (fn [x]
                      ;; 116 bytes messages
-                     (.send producer1 (ProducerRecord. topic p nil
+                     (.send producer1 (ProducerRecord. topic 
+                                                       (int p) 
+                                                       nil
                                                        (compress {:n x :really-long-string (apply str (repeatedly 30 (fn [] (rand-int 500))))})))) 
                    (range messages-per-partition))))))
     (println "Successfully wrote messages")))
@@ -102,7 +104,7 @@
 
 (deftest ^:benchmark kafka-input-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
-        {:keys [env-config peer-config]} (read-config (clojure.java.io/resource "config.edn")
+        {:keys [env-config peer-config test-config]} (read-config (clojure.java.io/resource "config.edn")
                                                       {:profile :bench})
         tenancy-id (str (java.util.UUID/randomUUID))
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
@@ -114,7 +116,7 @@
         {:keys [out read-messages]} (get-core-async-channels job)]
     (try
      (println "Topic is " test-topic)
-     (write-data test-topic zk-address)
+     (write-data test-topic zk-address (:kafka-bootstrap test-config))
      ;; Appropriate time to settle before submitting the job
      (Thread/sleep 5000)
      (let [job-ret (onyx.api/submit-job peer-config job)

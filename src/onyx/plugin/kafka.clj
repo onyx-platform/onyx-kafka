@@ -225,8 +225,7 @@
                    :payload m}))
 
           :else
-          (do (prn message-topic "--> " message-partition)
-              (ProducerRecord. message-topic message-partition k (serializer-fn message))))))
+          (ProducerRecord. message-topic (int 0) k (serializer-fn message)))))
 
 (defn clear-write-futures! [fs]
   (doall (remove (fn [f] 

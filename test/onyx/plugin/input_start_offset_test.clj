@@ -41,9 +41,9 @@
         (add-task (core-async/output :out batch-settings)))))
 
 (defn write-data-out
-  [topic zookeeper]
-  (h/create-topic! zookeeper topic)
-  (let [producer-config {"bootstrap.servers" ["127.0.0.1:9092"]}
+  [topic zookeeper bootstrap-servers]
+  (h/create-topic! zookeeper topic 1 1)
+  (let [producer-config {"bootstrap.servers" bootstrap-servers}
         key-serializer (h/byte-array-serializer)
         value-serializer (h/byte-array-serializer)]
     (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
@@ -62,7 +62,7 @@
         {:keys [out read-messages]} (get-core-async-channels job)]
     (with-test-env [test-env [4 env-config peer-config]]
       (onyx.test-helper/validate-enough-peers! test-env job)
-      (write-data-out test-topic zk-address)
+      (write-data-out test-topic zk-address (:kafka-bootstrap test-config))
       (->> job 
            (onyx.api/submit-job peer-config)
            (:job-id))
