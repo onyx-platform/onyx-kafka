@@ -1,21 +1,15 @@
 (ns onyx.plugin.input-multipartition-scheduling-test
   (:require [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
-            [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.topics :as k-topics]
-            [franzy.serialization.serializers :refer [byte-array-serializer]]
-            [franzy.clients.producer.client :as producer]
-            [franzy.clients.producer.protocols :refer [send-sync!]]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.utils]
             [onyx.tasks.kafka :refer [consumer]]
             [onyx.tasks.core-async :as core-async]
-            [onyx.plugin.core-async :refer [get-core-async-channels]]
+            [onyx.kafka.helpers :as h]
             [onyx.plugin.test-utils :as test-utils]
+            [onyx.plugin.core-async :refer [get-core-async-channels]]
             [onyx.plugin.kafka]
-            [onyx.api])
-  (:import [franzy.clients.producer.types ProducerRecord]))
+            [onyx.api]))
 
 (def n-partitions 4)
 
@@ -44,23 +38,23 @@
         (add-task (core-async/output :out batch-settings)))))
 
 (defn write-data
-  [topic zookeeper n-segments-each]
-  (let [zk-utils (k-admin/make-zk-utils {:servers [zookeeper]} false)
-        _ (k-topics/create-topic! zk-utils topic n-partitions)
-        producer-config {:bootstrap.servers ["127.0.0.1:9092"]}
-        key-serializer (byte-array-serializer)
-        value-serializer (byte-array-serializer)]
-    (with-open [producer1 (producer/make-producer producer-config key-serializer value-serializer)]
-      (with-open [producer2 (producer/make-producer producer-config key-serializer value-serializer)]
+  [topic zookeeper kafka-bootstrap n-segments-each]
+  (h/create-topic! zookeeper topic n-partitions 1)
+  (let [producer-config {"bootstrap.servers" kafka-bootstrap}
+        key-serializer (h/byte-array-serializer)
+        value-serializer (h/byte-array-serializer)]
+    (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
+      (with-open [producer2 (h/build-producer producer-config key-serializer value-serializer)]
         (doseq [x (range n-segments-each)] ;0 1 2
-          (send-sync! producer1 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n x})))))
+          (h/send-sync! producer1 topic nil nil (.getBytes (pr-str {:n x}))))
         (doseq [x (range n-segments-each)] ;3 4 5
-          (send-sync! producer2 (ProducerRecord. topic nil nil (.getBytes (pr-str {:n (+ n-segments-each x)})))))))))
+          (h/send-sync! producer2 topic nil nil (.getBytes (pr-str {:n (+ n-segments-each x)}))))))))
 
 (deftest kafka-multipartition-scheduling-test
   (let [test-topic (str (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
+        kafka-bootstrap (:kafka-bootstrap test-config)
         tenancy-id (str (java.util.UUID/randomUUID)) 
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
@@ -74,7 +68,7 @@
         n-segments-each 200]
       (with-test-env [test-env [(+ n-partitions 2) env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (write-data test-topic zk-address n-segments-each)
+        (write-data test-topic zk-address kafka-bootstrap n-segments-each)
         (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
           (println "Taking segments")
           ;(onyx.test-helper/feedback-exception! peer-config job-id)

@@ -1,5 +1,6 @@
 {:test-config
- {:embedded-kafka? #cond {:default false
+ {:kafka-bootstrap #env [KAFKA_BOOTSTRAP ["127.0.0.1:9092"]]
+  :embedded-kafka? #cond {:default false
                           :test false
                           :ci false}}
  :env-config
