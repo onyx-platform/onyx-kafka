@@ -1,3 +1,7 @@
+#### 0.10.0.1
+* Switch to plain Kafka producer and consumer.
+* Upgrade to Kafka 0.11.0.0.
+
 #### 0.10.0.0-beta9
 * Kafka input plugin now supports reading from multiple partitions with a single peer.
 

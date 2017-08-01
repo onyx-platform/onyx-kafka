@@ -59,7 +59,7 @@
 (def read-crash
   {:lifecycle/before-batch
    (fn [event lifecycle]
-     (when (= (swap! batch-num inc) 4)
+     (when (= (swap! batch-num inc) 4000)
        (throw (ex-info "Restartable" {:restartable? true}))))
    :lifecycle/handle-exception (constantly :restart)})
 
@@ -72,13 +72,13 @@
         peer-config (assoc peer-config 
                            :onyx/tenancy-id tenancy-id 
                            ;; should be much lower to get some checkpointing in
-                           :onyx.peer/coordinator-barrier-period-ms 500)
+                           :onyx.peer/coordinator-barrier-period-ms 1)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 2 1000)
-        test-data (conj (mapv (fn [v] {:n v}) (range 5000)) :done)]
+        test-data (conj (mapv (fn [v] {:n v}) (range 10000)) :done)]
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (test-utils/write-data test-topic zk-address test-data)
+        (test-utils/write-data test-topic zk-address (:kafka-bootstrap test-config) test-data)
         (->> job 
              (onyx.api/submit-job peer-config)
              :job-id

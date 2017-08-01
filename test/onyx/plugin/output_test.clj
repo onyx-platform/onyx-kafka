@@ -2,11 +2,9 @@
   (:require [clojure.core.async :refer [<!! go pipe close! >!!]]
             [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as component]
-            [franzy.admin.zookeeper.client :as k-admin]
-            [franzy.admin.cluster :as k-cluster]
             [onyx.test-helper :refer [with-test-env]]
             [onyx.job :refer [add-task]]
-            [onyx.kafka.utils :refer [take-now]]
+            [onyx.kafka.helpers :as h]
             [onyx.tasks.kafka :refer [producer]]
             [onyx.tasks.core-async :as core-async]
             [onyx.plugin.core-async :refer [get-core-async-channels]]
@@ -51,7 +49,6 @@
        (sort-by (comp :n :value))
        (map #(select-keys % [:key :partition :topic :value]))))
 
-
 (deftest kafka-output-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         other-test-topic (str "onyx-test-other-" (java.util.UUID/randomUUID))
@@ -61,6 +58,7 @@
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         zk-address (get-in peer-config [:zookeeper/address])
         job (build-job zk-address test-topic 10 1000)
+        bootstrap-servers (:kafka-bootstrap test-config)
         {:keys [in]} (get-core-async-channels job)
         test-data [{:key 1 :message {:n 0}}
                    {:message {:n 1}}
@@ -68,7 +66,8 @@
                    {:message {:n 3} :topic other-test-topic}]]
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (test-utils/create-topic zk-address other-test-topic)
+        (h/create-topic! zk-address test-topic 1 1)
+        (h/create-topic! zk-address other-test-topic 1 1)
         (run! #(>!! in %) test-data)
         (close! in)
         (->> (onyx.api/submit-job peer-config job)
@@ -77,7 +76,7 @@
         (testing "routing to default topic"
           (log/info "Waiting on messages in" test-topic)
           (let [msgs (prepare-messages
-                      (take-now zk-address test-topic decompress))]
+                      (h/take-now bootstrap-servers test-topic decompress 15000))]
             (is (= [test-topic] (->> msgs (map :topic) distinct)))
             (is (= [{:key 1 :value {:n 0} :partition 0}
                     {:key nil :value {:n 1} :partition 0}
@@ -87,4 +86,4 @@
           (log/info "Waiting on messages in" other-test-topic)
           (is (= [{:key nil :value {:n 3} :partition 0 :topic other-test-topic}]
                  (prepare-messages
-                  (take-now zk-address other-test-topic decompress))))))))
+                  (h/take-now bootstrap-servers other-test-topic decompress))))))))

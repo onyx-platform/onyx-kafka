@@ -1,6 +1,7 @@
 (ns onyx.plugin.input-broker-reboot-test
   (:require [aero.core :refer [read-config]]
             [clojure.core.async :refer [>!! chan]]
+            [onyx.kafka.helpers :as h]
             [clojure.test :refer [deftest is]]
             [com.stuartsierra.component :as component]
             [onyx api
@@ -70,10 +71,10 @@
         test-data1 (mapv (fn [i] {:n i}) (range 0 100))
         test-data2 (mapv (fn [i] {:n i}) (range 101 200))
         mock (atom {})
-        _ (test-utils/create-topic zk-address test-topic 2)]
+        _ (h/create-topic! zk-address test-topic 2 1)]
     (with-test-env [test-env [4 env-config peer-config]]
       (onyx.test-helper/validate-enough-peers! test-env job)
-      (test-utils/write-data test-topic zk-address test-data1)
+      (test-utils/write-data test-topic zk-address (:kafka-bootstrap test-config) test-data1)
       (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
         (Thread/sleep 10000)
         (stop-kafka mock embedded-kafka?)
@@ -82,7 +83,7 @@
         ;; wait for long enough before putting onto the input channel
         ;; otherwise it'll try to write to kafka before it's back up
         (Thread/sleep 60000)
-        (test-utils/write-data test-topic zk-address test-data2)
+        (test-utils/write-data test-topic zk-address (:kafka-bootstrap test-config) test-data2)
         ;(onyx.test-helper/feedback-exception! peer-config job-id)
         (is (= (set (into test-data1 test-data2))
                (set (onyx.plugin.core-async/take-segments! out 20000))))))))
