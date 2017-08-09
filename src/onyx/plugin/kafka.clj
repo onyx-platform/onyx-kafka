@@ -228,8 +228,8 @@
           (ProducerRecord. message-topic (int 0) k (serializer-fn message)))))
 
 (defn clear-write-futures! [fs]
-  (doall (remove (fn [f] 
-                   (assert (not (.isCancelled ^java.util.concurrent.Future f)))
+  (doall (remove (fn [^java.util.concurrent.Future f] 
+                   (assert (not (.isCancelled f)))
                    (.isDone f)) 
                  fs)))
 
