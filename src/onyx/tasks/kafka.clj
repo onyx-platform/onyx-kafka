@@ -48,7 +48,7 @@
     topic :- s/Str
     group-id :- s/Str
     zookeeper :- s/Str
-    offset-reset :- (s/enum :smallest :largest)
+    offset-reset :- (s/enum :earliest :latest)
     deserializer-fn :- os/NamespacedKeyword
     task-opts :- {s/Any s/Any}]
    (consumer task-name (merge {:kafka/topic topic
