@@ -73,9 +73,7 @@
        (assoc
         result
         id
-        (str (get-in endpoints [:plaintext :host])
-             ":"
-             (get-in endpoints [:plaintext :port]))))
+        (str (:host (first endpoints)) ":" (:port (first endpoints)))))
      {}
      (k-cluster/all-brokers zk-utils))))
 
