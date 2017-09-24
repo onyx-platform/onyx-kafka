@@ -5,6 +5,7 @@
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.plugin.protocols :as p]
+            [onyx.plugin.transactional-producer :as tp]
             [onyx.static.util :refer [kw->fn]]
             [onyx.tasks.kafka]
             [schema.core :as s]
@@ -233,13 +234,17 @@
                    (.isDone f)) 
                  fs)))
 
-(defrecord KafkaWriteMessages [task-map config topic kpartition producer key-serializer-fn serializer-fn write-futures exception write-callback]
+(def max-simultaneous-checkpoints 4)
+
+(defrecord KafkaWriteMessages 
+  [task-map topic kpartition log-prefix job-id slot-id producers producer-index producer 
+   key-serializer-fn serializer-fn write-futures exception write-callback]
   p/Plugin
   (start [this event] 
     this)
 
   (stop [this event] 
-    (.close ^KafkaProducer producer)
+    (.close ^KafkaProducer @producer)
     this)
 
   p/BarrierSynchronization
@@ -252,19 +257,45 @@
     (empty? (vswap! write-futures clear-write-futures!)))
 
   p/Checkpointed
-  (recover! [this _ _] 
+  (recover! [this replica-version checkpoint] 
+    (when-not (nil? checkpoint)
+      (run! (fn [[transaction-id epoch producer-id]]
+              (let [producer (new-producer task-map log-prefix transaction-id)]
+                (try (tp/resume-transaction producer producer-id epoch)
+                     (.commitTransaction producer)
+                     (catch org.apache.kafka.common.errors.InvalidTxnStateException itse
+                       (println "No transaction to commit."))
+                     (finally
+                      (.close producer))))) 
+            checkpoint))
+
+    (->> (range max-simultaneous-checkpoints)
+         (mapv (fn [i]
+                 (let [tid (str job-id "-" slot-id "-" i)]
+                   {:index i
+                    :transaction-id tid
+                    :producer (new-producer task-map log-prefix tid)})))
+         (vreset! producers))
     this)
 
-  (checkpoint [this])
+  (checkpoint [this]
+    (->> @producers
+         (filter :transasction?)
+         (mapv (fn [{:keys [transaction-id producer]}]
+                 [transaction-id
+                  (tp/epoch producer)
+                  (tp/producer-id producer)]))))
 
-  (checkpointed! [this epoch])
+  (checkpointed! [this epoch]
+    (.commitTransaction @producer))
 
   p/Output
   (prepare-batch [this event replica _]
     true)
 
-  (write-batch [this {:keys [onyx.core/results]} replica _]
+  (write-batch [this {:keys [onyx.core/results]} _ _]
     (when @exception (throw @exception))
+    ;; TODO, use counter for this stuff
     (vswap! write-futures
             (fn [fs]
               (-> fs
@@ -273,8 +304,11 @@
                               (map
                                (fn [msg]
                                  (let [record (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)]
-                                   (.send ^KafkaProducer producer record write-callback)))))
+                                   (.send ^KafkaProducer @producer record write-callback)))))
                         (:tree results)))))
+    ;(.abortTransaction producer)
+    ; (future (Thread/sleep 1000)
+    ;         (.abortTransaction producer))
     true))
 
 (def write-defaults {:kafka/request-size 307200})
@@ -284,25 +318,32 @@
   (onCompletion [_ v exception]
     (when exception (reset! e exception))))
 
-(defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
-  (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
-        request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
+(defn new-producer [task-map log-prefix transaction-id]
+  (let [request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
+        key-serializer (h/byte-array-serializer)
+        value-serializer (h/byte-array-serializer)
         config (merge {"bootstrap.servers" (vals (h/id->broker (:kafka/zookeeper task-map)))
+                       "transactional.id" transaction-id
                        "max.request.size" request-size}
                       producer-opts)
         _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
+        producer (h/build-producer config key-serializer value-serializer)]
+    (.initTransactions producer)
+    producer))
+
+(defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/job-id onyx.core/slot-id] :as event}]
+  (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         topic (:kafka/topic task-map)
         kpartition (:kafka/partition task-map)
-        key-serializer (h/byte-array-serializer)
-        value-serializer (h/byte-array-serializer)
-        producer (h/build-producer config key-serializer value-serializer)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))
         key-serializer-fn (if-let [kw (:kafka/key-serializer-fn task-map)] (kw->fn kw) identity)
         exception (atom nil)
         write-callback (->ExceptionCallback exception)
-        write-futures (volatile! (list))]
-    (->KafkaWriteMessages task-map config topic kpartition producer
+        write-futures (volatile! (list))
+        ]
+    (->KafkaWriteMessages task-map topic kpartition log-prefix job-id slot-id 
+                          (volatile! producers) (volatile! nil) (volatile! nil)
                           key-serializer-fn serializer-fn
                           write-futures exception write-callback)))
 

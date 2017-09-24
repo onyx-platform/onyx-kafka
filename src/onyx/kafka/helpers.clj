@@ -138,13 +138,17 @@
   work across multiple topics and another topic contained :done."
   ([bootstrap-servers topic decompress-fn]
    (take-now bootstrap-servers topic decompress-fn 5000))
-  ([bootstrap-servers topic decompress-fn timeout]
+  ([bootstrap-servers topic decompress-fn timeout opts]
    (log/info {:msg "Taking now..." :topic topic})
-   (let [c (build-consumer {"bootstrap.servers" bootstrap-servers} (byte-array-deserializer) (byte-array-deserializer))
+   (let [c (build-consumer (merge {"bootstrap.servers" bootstrap-servers} opts) 
+                           (byte-array-deserializer)
+                           (byte-array-deserializer))
          topic-partitions [{:topic topic :partition 0}]]
      (assign-partitions! c topic-partitions)
      (seek-to-beginning! c topic-partitions)
-     (mapv #(consumer-record->message decompress-fn %) (poll! c timeout)))))
+     (mapv #(consumer-record->message decompress-fn %) (poll! c timeout))))
+  ([bootstrap-servers topic decompress-fn timeout]
+   (take-now bootstrap-servers topic decompress-fn timeout {})))
 
 (defn create-topic! [zk-addr topic-name num-partitions replication-factor]
   (with-open [zk-utils (make-zk-utils {:servers zk-addr} false)]
