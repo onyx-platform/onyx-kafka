@@ -234,6 +234,23 @@
                    (.isDone f)) 
                  fs)))
 
+
+(def write-defaults {:kafka/request-size 307200})
+
+(defn new-producer [task-map log-prefix transaction-id]
+  (let [request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
+        producer-opts (:kafka/producer-opts task-map)
+        key-serializer (h/byte-array-serializer)
+        value-serializer (h/byte-array-serializer)
+        config (merge {"bootstrap.servers" (vals (h/id->broker (:kafka/zookeeper task-map)))
+                       "transactional.id" transaction-id
+                       "max.request.size" request-size}
+                      producer-opts)
+        _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
+        producer (h/build-producer config key-serializer value-serializer)]
+    (.initTransactions producer)
+    producer))
+
 (def max-simultaneous-checkpoints 4)
 
 (defrecord KafkaWriteMessages 
@@ -244,13 +261,29 @@
     this)
 
   (stop [this event] 
-    (.close ^KafkaProducer @producer)
+    (run! (fn [p] (.close (:producer p))) @producers)
     this)
 
   p/BarrierSynchronization
   (synced? [this epoch]
     (when @exception (throw @exception))
-    (empty? (vswap! write-futures clear-write-futures!)))
+    (let [synced? (empty? (vswap! write-futures clear-write-futures!))
+          next-epoch (inc epoch)]
+      (when synced?
+        (let [next-producer (or (first (filter (fn [p] (= next-epoch (:epoch p))) @producers)) 
+                                (first (remove :epoch @producers)))]
+          (when-not next-producer
+            (throw (ex-info "Not enough producers in the pool for this many simultaneous checkpoints." 
+                            {:max-simultaneous-checkpoints max-simultaneous-checkpoints})))
+          (when-not (:epoch next-producer)
+            (println "BEGINNINGTX" (:producer next-producer))
+            (.beginTransaction (:producer next-producer))
+            (println "ENDTX")
+            
+            )
+          (vswap! producers assoc-in [(:index next-producer) :epoch] next-epoch)
+          (vreset! producer (:producer next-producer))))
+      synced?))
 
   (completed? [this]
     (when @exception (throw @exception))
@@ -258,10 +291,15 @@
 
   p/Checkpointed
   (recover! [this replica-version checkpoint] 
+    ;; close all of the current producers
+    (run! (fn [p] (.close (:producer p))) @producers)
+    (vreset! producers nil)
+
+    ;; resume existing transactions
     (when-not (nil? checkpoint)
-      (run! (fn [[transaction-id epoch producer-id]]
+      (run! (fn [[transaction-id kepoch producer-id]]
               (let [producer (new-producer task-map log-prefix transaction-id)]
-                (try (tp/resume-transaction producer producer-id epoch)
+                (try (tp/resume-transaction producer producer-id kepoch)
                      (.commitTransaction producer)
                      (catch org.apache.kafka.common.errors.InvalidTxnStateException itse
                        (println "No transaction to commit."))
@@ -269,6 +307,7 @@
                       (.close producer))))) 
             checkpoint))
 
+    ;; create new producer pool
     (->> (range max-simultaneous-checkpoints)
          (mapv (fn [i]
                  (let [tid (str job-id "-" slot-id "-" i)]
@@ -280,20 +319,21 @@
 
   (checkpoint [this]
     (->> @producers
-         (filter :transasction?)
-         (mapv (fn [{:keys [transaction-id producer]}]
-                 [transaction-id
-                  (tp/epoch producer)
-                  (tp/producer-id producer)]))))
+         (filter :epoch)
+         (mapv (fn [{:keys [transaction-id producer epoch]}]
+                 [transaction-id (tp/epoch producer) (tp/producer-id producer) :onyx-epoch epoch]))))
 
   (checkpointed! [this epoch]
-    (.commitTransaction @producer))
+    (let [checkpointed-producer (first (filter (fn [p] (= epoch (:epoch p))) @producers))]
+      (.commitTransaction (:producer checkpointed-producer))
+      (vswap! producers update (:index checkpointed-producer) dissoc :epoch)))
 
   p/Output
   (prepare-batch [this event replica _]
     true)
 
   (write-batch [this {:keys [onyx.core/results]} _ _]
+    (println "MAP EPOCH" (map :epoch @producers) (:tree results))
     (when @exception (throw @exception))
     ;; TODO, use counter for this stuff
     (vswap! write-futures
@@ -311,26 +351,11 @@
     ;         (.abortTransaction producer))
     true))
 
-(def write-defaults {:kafka/request-size 307200})
 
 (deftype ExceptionCallback [e]
   Callback
   (onCompletion [_ v exception]
     (when exception (reset! e exception))))
-
-(defn new-producer [task-map log-prefix transaction-id]
-  (let [request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
-        producer-opts (:kafka/producer-opts task-map)
-        key-serializer (h/byte-array-serializer)
-        value-serializer (h/byte-array-serializer)
-        config (merge {"bootstrap.servers" (vals (h/id->broker (:kafka/zookeeper task-map)))
-                       "transactional.id" transaction-id
-                       "max.request.size" request-size}
-                      producer-opts)
-        _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
-        producer (h/build-producer config key-serializer value-serializer)]
-    (.initTransactions producer)
-    producer))
 
 (defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/job-id onyx.core/slot-id] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
@@ -340,10 +365,9 @@
         key-serializer-fn (if-let [kw (:kafka/key-serializer-fn task-map)] (kw->fn kw) identity)
         exception (atom nil)
         write-callback (->ExceptionCallback exception)
-        write-futures (volatile! (list))
-        ]
+        write-futures (volatile! (list))]
     (->KafkaWriteMessages task-map topic kpartition log-prefix job-id slot-id 
-                          (volatile! producers) (volatile! nil) (volatile! nil)
+                          (volatile! nil) (volatile! nil) (volatile! nil)
                           key-serializer-fn serializer-fn
                           write-futures exception write-callback)))
 

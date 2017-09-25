@@ -29,35 +29,6 @@
        (sort-by (comp :n :value))
        (map #(select-keys % [:key :partition :topic :value]))))
 
-(comment (try 
-          (invoke (get-value pp "transactionManager") 
-                  "transitionTo" 
-                  [(state-enum "READY")])
-          (catch Throwable t
-            (.getCause t)))
-
-         (resume-transaction pp)
-
-
-         
-
-         (identity pp)
-         (.initTransactions pp))
-
-(comment
-
- (try (resume-transaction pp (short 3) (short 5)) 
-     (catch Throwable t 
-       (.getCause t)
-       
-       )
-     
-     ))
-
-;(.beginTransaction pp)
-;(.commitTransaction pp)
-;(.beginTransaction pp)
-
 (deftest kafka-output-test
   (let [test-topic (str "onyx-test-" (java.util.UUID/randomUUID))
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
@@ -76,24 +47,26 @@
         event {:onyx.core/slot-id 0
                :onyx.core/log-prefix ""
                :onyx.core/job-id (java.util.UUID/randomUUID)
-               :onyx.core/results {:tree [{:leaves [{:message {:a (java.util.UUID/randomUUID)}}]}]}
                :onyx.core/task-map (:task-map (:task bundle))}
         plugin (onyx.plugin.kafka/write-messages event)
         pp (:producer plugin)
-        _ (p/recover! plugin 1 nil)
-        _ (println "CP" (p/checkpoint plugin))
-        _ (p/write-batch plugin event nil nil)
-        _ (println "TT111" (prepare-messages (h/take-now bootstrap-servers test-topic decompress 2000 {"isolation.level" "read_committed"})))
-        _ (println "TT111" (prepare-messages (h/take-now bootstrap-servers test-topic decompress 2000 {"isolation.level" "read_committed"})))
+        _ (p/recover! plugin 0 nil)
+        _ (p/synced? plugin 0)
+        _ (p/write-batch plugin 
+                         (assoc event :onyx.core/results {:tree [{:leaves [{:message {:a 1}}]}]}) 
+                         nil 
+                         nil)
+        _ (is (empty? (prepare-messages (h/take-now bootstrap-servers test-topic decompress 2000 {"isolation.level" "read_committed"}))))
         checkpoint (p/checkpoint plugin)
-        _ (p/checkpointed! plugin 9999)
-        _ (println "CP NOW" checkpoint)
-        _ (println "TT11" (prepare-messages (h/take-now bootstrap-servers test-topic decompress 2000 {"isolation.level" "read_committed"})))
-        _ (p/stop plugin event)
-        ;plugin2 (onyx.plugin.kafka/write-messages event)
-        ;pp2 (:producer plugin2)
-        ;_ (p/recover! plugin2 2 checkpoint)
-        ;_ (p/stop plugin2 event)
-        msgs (prepare-messages (h/take-now bootstrap-servers test-topic decompress 15000))]
-    (println "MSGS" msgs)
-    ))
+        _ (p/synced? plugin 1)
+        checkpoint2 (p/checkpoint plugin)
+        _ (p/write-batch plugin 
+                         (assoc event :onyx.core/results {:tree [{:leaves [{:message {:a 2}}]}]}) 
+                         nil 
+                         nil)
+        _ (is (empty? (prepare-messages (h/take-now bootstrap-servers test-topic decompress 2000 {"isolation.level" "read_committed"}))))
+        _ (p/synced? plugin 2)
+        _ (p/checkpointed! plugin 1)
+        _ (p/checkpointed! plugin 2)
+        _ (is (= [{:a 1} {:a 2}] (map :value (prepare-messages (h/take-now bootstrap-servers test-topic decompress 2000 {"isolation.level" "read_committed"})))))
+        _ (p/stop plugin event)]))

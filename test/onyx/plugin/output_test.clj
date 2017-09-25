@@ -68,8 +68,13 @@
         (onyx.test-helper/validate-enough-peers! test-env job)
         (h/create-topic! zk-address test-topic 1 1)
         (h/create-topic! zk-address other-test-topic 1 1)
-        (run! #(>!! in %) test-data)
-        (close! in)
+        (future (run! (fn [v] (>!! in v)
+                        (Thread/sleep 5000)) 
+                      test-data)
+                (close! in)        
+                
+                )
+        
         (->> (onyx.api/submit-job peer-config job)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))
