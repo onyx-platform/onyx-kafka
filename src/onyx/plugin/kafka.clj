@@ -13,6 +13,7 @@
            [org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord]
            [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer]
            [org.apache.kafka.common TopicPartition]
+           [org.apache.kafka.common.metrics Metrics]
            [org.apache.kafka.clients.producer Callback KafkaProducer ProducerRecord]))
 
 (def defaults
@@ -100,9 +101,16 @@
       (h/assign-partitions! consumer* parts)
       parts-range)))
 
+(defn set-lag! [^AtomicLong lag-gauge ^KafkaConsumer consumer]
+  (.set lag-gauge 
+        (reduce (fn [lag [tp offset]]
+                  (+ lag (- offset (.position consumer tp)))) 
+                0
+                (.endOffsets consumer (.assignment consumer)))))
+
 (deftype KafkaReadMessages 
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
-     deserializer-fn segment-fn read-offset ^:unsynchronized-mutable consumer 
+     deserializer-fn segment-fn ^AtomicLong lag-gauge ^:unsynchronized-mutable consumer 
      ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
@@ -149,6 +157,7 @@
 
   p/BarrierSynchronization
   (synced? [this epoch]
+    (set-lag! lag-gauge consumer)
     true)
 
   (completed? [this]
@@ -165,7 +174,6 @@
               deserialized
               (let [new-offset (.offset rec)
                     part (.partition rec)]
-                (.set ^AtomicLong read-offset new-offset)
                 (set! partition->offset (assoc partition->offset part new-offset))
                 deserialized)))
       (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
@@ -189,9 +197,9 @@
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))
-        read-offset (:read-offset monitoring)]
+        {:keys [lag-gauge]} monitoring]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
-                         deserializer-fn segment-fn read-offset nil nil nil false)))
+                         deserializer-fn segment-fn lag-gauge nil nil nil false)))
 
 (defn close-read-messages
   [event lifecycle]
