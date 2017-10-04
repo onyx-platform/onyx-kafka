@@ -13,7 +13,7 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.8.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.11.1-20171003_232813-gb43b85a"]
+                 [org.onyxplatform/onyx "0.11.1-20171004_232316-g9d5c3ac"]
                  [org.apache.kafka/kafka_2.11 "0.11.0.0"]
                  [org.apache.kafka/kafka-clients "0.11.0.0"]
                  [com.stuartsierra/component "0.2.3"]
