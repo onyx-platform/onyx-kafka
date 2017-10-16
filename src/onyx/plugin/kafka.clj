@@ -110,7 +110,7 @@
 
 (deftype KafkaReadMessages 
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
-     deserializer-fn segment-fn ^AtomicLong lag-gauge ^:unsynchronized-mutable consumer 
+     deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^:unsynchronized-mutable consumer 
      ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
@@ -142,6 +142,11 @@
       (set! consumer nil))
     this)
 
+
+  p/WatermarkedInput
+  (watermark [this] 
+    (.get watermark))
+
   p/Checkpointed
   (checkpoint [this]
     partition->offset)
@@ -168,6 +173,7 @@
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             deserialized (some-> rec segment-fn)]
+        (.set watermark (max (.get watermark) (.timestamp rec)))
         (cond (= :done deserialized)
               (do (set! drained true)
                   nil)
@@ -197,9 +203,11 @@
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))
+        watermark (AtomicLong. 0)
         {:keys [lag-gauge]} monitoring]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
-                         deserializer-fn segment-fn lag-gauge nil nil nil false)))
+                         deserializer-fn segment-fn watermark lag-gauge 
+                         nil nil nil false)))
 
 (defn close-read-messages
   [event lifecycle]
