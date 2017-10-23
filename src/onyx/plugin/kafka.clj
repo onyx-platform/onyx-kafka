@@ -226,7 +226,8 @@
   (let [message (:message m)
         k (some-> m :key key-serializer-fn)
         message-topic (get m :topic topic)
-        message-partition (some-> m (get :partition kpartition) int)]
+        message-partition  (some-> m (get :partition kpartition) int)
+        message-timestamp (some-> m (get :timestamp) long)]
     (cond (not (contains? m :message))
           (throw (ex-info "Payload is missing required. Need message key :message"
                           {:recoverable? false
@@ -241,7 +242,7 @@
                    :payload m}))
 
           :else
-          (ProducerRecord. message-topic message-partition k (serializer-fn message)))))
+          (ProducerRecord. ^String message-topic ^Integer message-partition ^Long message-timestamp k (serializer-fn message)))))
 
 (defn clear-write-futures! [fs]
   (doall (remove (fn [^java.util.concurrent.Future f] 
