@@ -2,7 +2,7 @@
   (:require [clojure.string :as string]
             [taoensso.timbre :as log])
   (:import [kafka.utils ZkUtils]
-           [org.apache.kafka.clients.consumer KafkaConsumer]
+           [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRecord]
            [org.apache.kafka.clients.producer KafkaProducer Callback ProducerRecord]
            [org.apache.kafka.common.serialization ByteArrayDeserializer ByteArraySerializer Serializer Deserializer]
            [org.apache.kafka.common TopicPartition]
@@ -124,11 +124,12 @@
     (.seekToEnd ^KafkaConsumer consumer encoded)))
 
 (defn consumer-record->message
-  [decompress-fn m]
+  [decompress-fn ^ConsumerRecord m]
   {:key (some-> m (.key) decompress-fn)
    :partition (.partition m)
    :topic (.topic m)
-   :value (-> m (.value) decompress-fn)})
+   :value (-> m (.value) decompress-fn)
+   :timestamp (.timestamp m)})
 
 (defn poll! [consumer timeout]
   (.poll ^KafkaConsumer consumer timeout))
