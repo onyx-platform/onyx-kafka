@@ -1,3 +1,10 @@
+#### 0.11.0.1
+* output plugin: Fix bug where messages would be sent to the wrong partition. 
+* output plugin: Add support for providing a timestamp in the kafka message.
+
+#### 0.11.0.0
+* Support Onyx level watermarks.
+
 #### 0.10.0.1
 * Switch to plain Kafka producer and consumer.
 * Upgrade to Kafka 0.11.0.0.
