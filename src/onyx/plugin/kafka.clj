@@ -280,7 +280,7 @@
   (prepare-batch [this event replica _]
     true)
 
-  (write-batch [this {:keys [onyx.core/results]} replica _]
+  (write-batch [this {:keys [onyx.core/write-batch]} replica _]
     (when @exception (throw @exception))
     (vswap! write-futures
             (fn [fs]
@@ -291,7 +291,7 @@
                                (fn [msg]
                                  (let [record (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)]
                                    (.send ^KafkaProducer producer record write-callback)))))
-                        (:tree results)))))
+                        write-batch))))
     true))
 
 (def write-defaults {:kafka/request-size 307200})
