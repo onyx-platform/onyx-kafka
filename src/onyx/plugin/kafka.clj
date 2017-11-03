@@ -286,12 +286,11 @@
             (fn [fs]
               (-> fs
                   (clear-write-futures!)
-                  (into (comp (mapcat :leaves)
-                              (map
-                               (fn [msg]
-                                 (let [record (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)]
-                                   (.send ^KafkaProducer producer record write-callback)))))
-                        write-batch))))
+                  (into (map
+                         (fn [msg]
+                           (let [record (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)]
+                             (.send ^KafkaProducer producer record write-callback)))
+                         write-batch)))))
     true))
 
 (def write-defaults {:kafka/request-size 307200})
