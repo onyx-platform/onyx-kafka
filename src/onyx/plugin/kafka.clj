@@ -77,7 +77,7 @@
         fixed-npeers? (or (= min-peers max-peers) (= 1 max-peers)
                           (and n-peers (and (not min-peers) (not max-peers))))
         n-peers (or max-peers n-peers)
-        n-peers-less-eq-n-partitions (<= n-peers n-partitions)] 
+        n-peers-less-eq-n-partitions (and n-peers (<= n-peers n-partitions))] 
     (when-not (or fixed-partition? fixed-npeers? n-peers-less-eq-n-partitions)
       (let [e (ex-info ":onyx/min-peers must equal :onyx/max-peers, or :onyx/n-peers must be set, and :onyx/min-peers and :onyx/max-peers must not be set. Number of peers should also be less than or equal to the number of partitions."
                        {:n-partitions n-partitions 
