@@ -21,6 +21,7 @@
                                                 :test #env [ZOOKEEPER "127.0.0.1:2181"]}
   :onyx.peer/job-scheduler               :onyx.job-scheduler/greedy
   :onyx.peer/zookeeper-timeout           60000
+  :onyx.peer/storage.zk.insanely-allow-windowing? true
   :onyx.messaging/allow-short-circuit?   #cond {:default true
                                                 :bench true
                                                 :test true}
