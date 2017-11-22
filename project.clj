@@ -23,6 +23,7 @@
                                   [zookeeper-clj "0.9.3" :exclusions [io.netty/netty org.apache.zookeeper/zookeeper]]
                                   [aero "0.2.0"]
                                   [prismatic/schema "1.0.5"]] 
+                   :resource-paths ["test-resources/"]
                    :plugins [[lein-set-version "0.4.1"]
                              [lein-update-dependency "0.1.2"]
                              [lein-pprint "1.1.1"]]
