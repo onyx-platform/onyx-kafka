@@ -74,7 +74,8 @@
   [{:keys [onyx/min-peers onyx/max-peers onyx/n-peers kafka/partition] :as task-map} n-partitions]
   (let [fixed-partition? (and partition (or (= 1 n-peers)
                                             (= 1 max-peers)))
-        fixed-npeers? (or (= min-peers max-peers) (= 1 max-peers)
+        fixed-npeers? (or (and min-peers (= min-peers max-peers)) 
+                          (= 1 max-peers)
                           (and n-peers (and (not min-peers) (not max-peers))))
         n-peers (or max-peers n-peers)
         n-peers-less-eq-n-partitions (and n-peers (<= n-peers n-partitions))] 
