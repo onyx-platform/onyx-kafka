@@ -114,8 +114,8 @@
      ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained]
   p/Plugin
   (start [this event]
-    (let [{:keys [kafka/group-id kafka/consumer-opts]} task-map
-          brokers (find-brokers task-map)
+    (let [{:keys [kafka/bootstrap-servers kafka/group-id kafka/consumer-opts]} task-map
+          brokers (or bootstrap-servers (find-brokers task-map))
           _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
           consumer-config (merge {"bootstrap.servers" brokers
                                   "group.id" (or group-id "onyx")
@@ -302,9 +302,10 @@
 
 (defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
+        brokers (or (:kafka/bootstrap-servers task-map) (find-brokers task-map))
         request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
-        config (merge {"bootstrap.servers" (vals (h/id->broker (:kafka/zookeeper task-map)))
+        config (merge {"bootstrap.servers" brokers
                        "max.request.size" request-size}
                       producer-opts)
         _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
