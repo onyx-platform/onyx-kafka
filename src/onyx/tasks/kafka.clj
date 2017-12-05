@@ -19,9 +19,10 @@
 
 (def KafkaInputTaskMap
   {:kafka/topic s/Str
-   :kafka/zookeeper s/Str
    :kafka/offset-reset (s/enum :earliest :latest)
    :kafka/deserializer-fn os/NamespacedKeyword
+   (s/optional-key :kafka/bootstrap-servers) [s/Str]
+   (s/optional-key :kafka/zookeeper) s/Str
    (s/optional-key :kafka/key-deserializer-fn) os/NamespacedKeyword
    (s/optional-key :kafka/group-id) s/Str
    (s/optional-key :kafka/consumer-opts) {s/Any s/Any}
@@ -47,13 +48,13 @@
   ([task-name :- s/Keyword
     topic :- s/Str
     group-id :- s/Str
-    zookeeper :- s/Str
+    boostrap-servers :- [s/Str]
     offset-reset :- (s/enum :earliest :latest)
     deserializer-fn :- os/NamespacedKeyword
     task-opts :- {s/Any s/Any}]
    (consumer task-name (merge {:kafka/topic topic
                                :kafka/group-id group-id
-                               :kafka/zookeeper zookeeper
+                               :kafka/bootstrap-servers bootstrap-servers
                                :kafka/offset-reset offset-reset
                                :kafka/deserializer-fn deserializer-fn}
                               task-opts))))
@@ -67,8 +68,9 @@
 
 (def KafkaOutputTaskMap
   {(s/optional-key :kafka/topic) s/Str
-   :kafka/zookeeper s/Str
    :kafka/serializer-fn os/NamespacedKeyword
+   (s/optional-key :kafka/bootstrap-servers) [s/Str]
+   (s/optional-key :kafka/zookeeper) s/Str
    (s/optional-key :kafka/key-serializer-fn) os/NamespacedKeyword
    (s/optional-key :kafka/request-size) s/Num
    (s/optional-key :kafka/partition) (s/cond-pre s/Int s/Str)
@@ -89,12 +91,12 @@
     :schema {:task-map KafkaOutputTaskMap}})
   ([task-name :- s/Keyword
     topic :- s/Str
-    zookeeper :- s/Str
+    boostrap-servers :- [s/Str]
     serializer-fn :- os/NamespacedKeyword
     request-size :- s/Num
     task-opts :- {s/Any s/Any}]
    (producer task-name (merge {:kafka/topic topic
-                               :kafka/zookeeper zookeeper
+                               :kafka/bootstrap-servers bootstrap-servers
                                :kafka/serializer-fn serializer-fn
                                :kafka/request-size request-size}
                               task-opts))))
