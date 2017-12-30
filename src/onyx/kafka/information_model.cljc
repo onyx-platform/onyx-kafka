@@ -17,9 +17,15 @@
               :type :string
               :optional? true}
 
+             :kafka/bootstrap-servers
+             {:doc "The list of Kafka brokers to use for connection bootstrap."
+              :type [:string]
+              :optional? true}
+
              :kafka/zookeeper
              {:doc "The ZooKeeper connection string."
-              :type :string}
+              :type :string
+              :optional? true}
 
              :kafka/offset-reset
              {:doc "Offset bound to seek to when not found - `:earliest` or `:latest`."
@@ -105,9 +111,15 @@
               :type :string
               :optional? true}
 
+             :kafka/bootstrap-servers
+             {:doc "The list of Kafka brokers to use for connection bootstrap."
+              :type [:string]
+              :optional? true}
+
              :kafka/zookeeper
              {:doc "The ZooKeeper connection string."
-              :type :string}
+              :type :string
+              :optional? true}
 
              :kafka/request-size
              {:doc "The maximum size of request messages.  Maps to the `max.request.size` value of the internal kafka producer."
@@ -151,6 +163,7 @@
      :kafka/partition
      :kafka/group-id
      :kafka/zookeeper
+     :kafka/bootstrap-servers
      :kafka/offset-reset
      :kafka/force-reset?
      :kafka/deserializer-fn
@@ -167,6 +180,7 @@
     :onyx.plugin.kafka/write-messages
     [:kafka/topic
      :kafka/zookeeper
+     :kafka/bootstrap-servers
      :kafka/partition
      :kafka/serializer-fn
      :kafka/key-serializer-fn
