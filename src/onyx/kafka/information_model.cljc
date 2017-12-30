@@ -163,6 +163,7 @@
      :kafka/partition
      :kafka/group-id
      :kafka/zookeeper
+     :kafka/bootstrap-servers
      :kafka/offset-reset
      :kafka/force-reset?
      :kafka/deserializer-fn
@@ -179,6 +180,7 @@
     :onyx.plugin.kafka/write-messages
     [:kafka/topic
      :kafka/zookeeper
+     :kafka/bootstrap-servers
      :kafka/partition
      :kafka/serializer-fn
      :kafka/key-serializer-fn

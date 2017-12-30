@@ -48,13 +48,13 @@
   ([task-name :- s/Keyword
     topic :- s/Str
     group-id :- s/Str
-    boostrap-servers :- [s/Str]
+    zookeeper :- s/Str
     offset-reset :- (s/enum :earliest :latest)
     deserializer-fn :- os/NamespacedKeyword
     task-opts :- {s/Any s/Any}]
    (consumer task-name (merge {:kafka/topic topic
                                :kafka/group-id group-id
-                               :kafka/bootstrap-servers bootstrap-servers
+                               :kafka/zookeeper zookeeper
                                :kafka/offset-reset offset-reset
                                :kafka/deserializer-fn deserializer-fn}
                               task-opts))))
@@ -91,12 +91,12 @@
     :schema {:task-map KafkaOutputTaskMap}})
   ([task-name :- s/Keyword
     topic :- s/Str
-    boostrap-servers :- [s/Str]
+    zookeeper :- s/Str
     serializer-fn :- os/NamespacedKeyword
     request-size :- s/Num
     task-opts :- {s/Any s/Any}]
    (producer task-name (merge {:kafka/topic topic
-                               :kafka/bootstrap-servers bootstrap-servers
+                               :kafka/zookeeper zookeeper
                                :kafka/serializer-fn serializer-fn
                                :kafka/request-size request-size}
                               task-opts))))
