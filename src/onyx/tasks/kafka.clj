@@ -2,7 +2,8 @@
   (:require [cheshire.core :as json]
             [schema.core :as s]
             [onyx.job :refer [add-task]]
-            [onyx.schema :as os]))
+            [onyx.schema :as os])
+  (:import [com.fasterxml.jackson.core JsonGenerationException]))
 
 ;;;; Reader task
 (defn deserialize-message-json [bytes]
@@ -61,7 +62,13 @@
 
 ;;;; Writer task
 (defn serialize-message-json [segment]
-  (.getBytes (json/generate-string segment)))
+  (try
+    (.getBytes (json/generate-string segment))
+    (catch JsonGenerationException e
+      (throw (ex-info (format "Could not serialize segment: %s" segment)
+                      {:recoverable? false
+                       :segment segment
+                       :cause e})))))
 
 (defn serialize-message-edn [segment]
   (.getBytes (pr-str segment)))
