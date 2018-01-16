@@ -6,15 +6,15 @@
   (:import [com.fasterxml.jackson.core JsonGenerationException]))
 
 ;;;; Reader task
-(defn deserialize-message-json [bytes]
+(defn deserialize-message-json [^bytes bs]
   (try
-    (json/parse-string (String. bytes "UTF-8"))
+    (json/parse-string (String. bs "UTF-8"))
     (catch Exception e
       {:error e})))
 
-(defn deserialize-message-edn [bytes]
+(defn deserialize-message-edn [^bytes bs]
   (try
-    (read-string (String. bytes "UTF-8"))
+    (read-string (String. bs "UTF-8"))
     (catch Exception e
       {:error e})))
 
