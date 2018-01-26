@@ -56,7 +56,7 @@
 (defn find-brokers [task-map]
   (let [zk-addr (:kafka/zookeeper task-map)
         _ (when-not zk-addr
-            (throw (ex-info "Either :kafka/bootstrap-servers or :kafka/zookeeper must be defined.")))
+            (throw (ex-info "Either :kafka/bootstrap-servers or :kafka/zookeeper must be defined." {:task-map task-map})))
         results (vals (h/id->broker zk-addr))]
     (if (seq results)
       results
