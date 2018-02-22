@@ -97,6 +97,10 @@
              :kafka/start-offsets
              {:doc "Allows a task to be supplied with the starting offsets for all partitions. Maps partition to offset, e.g. `{0 50, 1, 90}` will start at offset 50 for partition 0, and offset 90 for partition 1."
               :type :map
+              :optional? true}
+             :kafka/target-offset
+             {:doc "TBD"
+              :type :map
               :optional? true}}}
 
     :onyx.plugin.kafka/write-messages
@@ -172,6 +176,7 @@
      :kafka/commit-interval
      :kafka/wrap-with-metadata?
      :kafka/start-offsets
+     :kafka/target-offset
      :kafka/consumer-opts
      :kafka/empty-read-back-off
      :kafka/fetch-size

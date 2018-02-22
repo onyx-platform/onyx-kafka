@@ -63,7 +63,7 @@
       results
       (do
         (info "Could not locate any Kafka brokers to connect to. Backing off.")
-        (Thread/sleep (or (:kafka/unable-to-find-broker-backoff-ms task-map) 
+        (Thread/sleep (or (:kafka/unable-to-find-broker-backoff-ms task-map)
                           (:kafka/unable-to-find-broker-backoff-ms defaults)))
         (throw (ex-info "Could not locate any Kafka brokers to connect to."
                         {:recoverable? true
@@ -73,23 +73,23 @@
   [event lifecycle]
   {})
 
-(defn check-num-peers-equals-partitions 
+(defn check-num-peers-equals-partitions
   [{:keys [onyx/min-peers onyx/max-peers onyx/n-peers kafka/partition] :as task-map} n-partitions]
   (let [fixed-partition? (and partition (or (= 1 n-peers)
                                             (= 1 max-peers)))
-        fixed-npeers? (or (and min-peers (= min-peers max-peers)) 
+        fixed-npeers? (or (and min-peers (= min-peers max-peers))
                           (= 1 max-peers)
                           (and n-peers (and (not min-peers) (not max-peers))))
         n-peers (or max-peers n-peers)
-        n-peers-less-eq-n-partitions (and n-peers (<= n-peers n-partitions))] 
+        n-peers-less-eq-n-partitions (and n-peers (<= n-peers n-partitions))]
     (when-not (or fixed-partition? fixed-npeers? n-peers-less-eq-n-partitions)
       (let [e (ex-info ":onyx/min-peers must equal :onyx/max-peers, or :onyx/n-peers must be set, and :onyx/min-peers and :onyx/max-peers must not be set. Number of peers should also be less than or equal to the number of partitions."
-                       {:n-partitions n-partitions 
+                       {:n-partitions n-partitions
                         :n-peers n-peers
                         :min-peers min-peers
                         :max-peers max-peers
                         :recoverable? false
-                        :task-map task-map})] 
+                        :task-map task-map})]
         (log/error e)
         (throw e)))))
 
@@ -106,16 +106,34 @@
       parts-range)))
 
 (defn set-lag! [^AtomicLong lag-gauge ^KafkaConsumer consumer]
-  (.set lag-gauge 
+  (.set lag-gauge
         (reduce (fn [lag [tp offset]]
-                  (+ lag (- offset (.position consumer tp)))) 
+                  (+ lag (- offset (.position consumer tp))))
                 0
                 (.endOffsets consumer (.assignment consumer)))))
 
-(deftype KafkaReadMessages 
+(defn pause-partitions-over-target-offset
+  [^KafkaConsumer consumer topic partition->offset targets]
+  (doseq [[partition target-offset] targets]
+    (let [current-offset (get partition->offset partition 0)]
+      (when (>= current-offset target-offset)
+        (let [topic-partition (TopicPartition. topic partition)]
+          (.pause consumer [topic-partition]))))))
+
+(defn all-partitions-paused?
+  [^KafkaConsumer consumer kpartitions]
+  (let [paused (into #{}
+                     (map #(.partition %))
+                     (.paused consumer))]
+    (taoensso.timbre/errorf "Partitions: %s Paused: %s" kpartitions paused)
+    (= paused (set kpartitions))))
+
+
+(deftype KafkaReadMessages
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
-     deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^:unsynchronized-mutable consumer 
-     ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained]
+     deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^:unsynchronized-mutable consumer
+     ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained
+     target-offsets]
   p/Plugin
   (start [this event]
     (let [{:keys [kafka/bootstrap-servers kafka/group-id kafka/consumer-opts]} task-map
@@ -140,21 +158,21 @@
         (set! kpartitions kpartitions*)
         this)))
 
-  (stop [this event] 
-    (when consumer 
+  (stop [this event]
+    (when consumer
       (.close ^KafkaConsumer consumer)
       (set! consumer nil))
     this)
 
 
   p/WatermarkedInput
-  (watermark [this] 
+  (watermark [this]
     (.get watermark))
 
   p/Checkpointed
   (checkpoint [this]
     partition->offset)
-
+  ;;  checkpoint map looks like {part offset}
   (recover! [this replica-version checkpoint]
     (set! drained false)
     (set! iter nil)
@@ -178,19 +196,33 @@
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
             deserialized (some-> rec segment-fn)]
         (.set watermark (max (.get watermark) (.timestamp rec)))
-        (cond (= :done deserialized)
-              (do (set! drained true)
-                  nil)
+
+        (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
+              (do (set! drained true) nil)
+
               deserialized
               (let [new-offset (.offset rec)
                     part (.partition rec)]
                 (set! partition->offset (assoc partition->offset part new-offset))
+
+                (when-let [target-offset (get target-offsets part)]
+                  (when (>= new-offset target-offset)
+                    (let [new-assignments (into [] (remove #(= part (.partition %)))
+                                                (.assignment consumer))]
+                      (.assign consumer new-assignments)
+                      ;; Setting the iter as nil forces the plugin to re-poll with the
+                      ;; new partition assignments, this only happens once when we hit
+                      ;; a target offset so it shouldn't be too bad.
+                      (set! iter nil)
+                      (when (empty? new-assignments)
+                        (set! drained true)))))
                 deserialized)))
-      (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
-          nil))))
+      (when-not drained
+        (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
+            nil)))))
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
-  (let [{:keys [kafka/topic kafka/deserializer-fn]} task-map
+  (let [{:keys [kafka/topic kafka/deserializer-fn kafka/target-offset]} task-map
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
         deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
@@ -210,8 +242,8 @@
         watermark (AtomicLong. 0)
         {:keys [lag-gauge]} monitoring]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
-                         deserializer-fn segment-fn watermark lag-gauge 
-                         nil nil nil false)))
+                         deserializer-fn segment-fn watermark lag-gauge
+                         nil nil nil false target-offset)))
 
 (defn close-read-messages
   [event lifecycle]
@@ -249,17 +281,17 @@
           (ProducerRecord. ^String message-topic ^Integer message-partition ^Long message-timestamp k (serializer-fn message)))))
 
 (defn clear-write-futures! [fs]
-  (doall (remove (fn [^java.util.concurrent.Future f] 
+  (doall (remove (fn [^java.util.concurrent.Future f]
                    (assert (not (.isCancelled f)))
-                   (.isDone f)) 
+                   (.isDone f))
                  fs)))
 
 (defrecord KafkaWriteMessages [task-map config topic kpartition producer key-serializer-fn serializer-fn write-futures exception write-callback]
   p/Plugin
-  (start [this event] 
+  (start [this event]
     this)
 
-  (stop [this event] 
+  (stop [this event]
     (.close ^KafkaProducer producer)
     this)
 
@@ -273,7 +305,7 @@
     (empty? (vswap! write-futures clear-write-futures!)))
 
   p/Checkpointed
-  (recover! [this _ _] 
+  (recover! [this _ _]
     this)
 
   (checkpoint [this])
