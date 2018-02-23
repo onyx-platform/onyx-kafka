@@ -1,3 +1,5 @@
+#### 0.12.7.0
+* Upgrade to kafka 1.0.0.
 #### 0.11.0.1
 * output plugin: Fix bug where messages would be sent to the wrong partition. 
 * output plugin: Add support for providing a timestamp in the kafka message.
