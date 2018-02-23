@@ -74,7 +74,9 @@
                    (write-data test-topic zk-address (:kafka-bootstrap test-config))
                    (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
                      (let [first-results (onyx.plugin.core-async/take-segments! out 10000)
-                           partition-count-map (into {}(map (fn [[k v]][k (count v)]))
+                           partition-count-map (into {}
+                                                     (map (fn [[k v]]
+                                                            [k (count v)]))
                                                      (group-by :partition first-results))]
                        (testing "We get the exact ammount of records requested"
                          (is (= (get partition-count-map 0) 20))

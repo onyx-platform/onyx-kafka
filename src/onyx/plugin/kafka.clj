@@ -177,6 +177,7 @@
     (set! drained false)
     (set! iter nil)
     (set! partition->offset checkpoint)
+    (.resume consumer (.assignment consumer))
     (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint)
     this)
 
@@ -202,21 +203,18 @@
 
               deserialized
               (let [new-offset (.offset rec)
-                    part (.partition rec)]
+                    part (.partition rec)
+                    target-offset (get target-offsets part)]
                 (set! partition->offset (assoc partition->offset part new-offset))
-
-                (when-let [target-offset (get target-offsets part)]
-                  (when (>= new-offset target-offset)
-                    (let [new-assignments (into [] (remove #(= part (.partition %)))
-                                                (.assignment consumer))]
-                      (.assign consumer new-assignments)
-                      ;; Setting the iter as nil forces the plugin to re-poll with the
-                      ;; new partition assignments, this only happens once when we hit
-                      ;; a target offset so it shouldn't be too bad.
-                      (set! iter nil)
-                      (when (empty? new-assignments)
-                        (set! drained true)))))
-                deserialized)))
+                (if target-offset
+                  (if (>= new-offset target-offset)
+                    (do
+                      (.pause consumer [(TopicPartition. topic part)])
+                      (when (all-partitions-paused? consumer kpartitions)
+                        (set! drained true))
+                      nil)
+                    deserialized)
+                  deserialized))))
       (when-not drained
         (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
             nil)))))
