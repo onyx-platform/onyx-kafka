@@ -19,7 +19,6 @@
 
 (def defaults
   {:kafka/receive-buffer-bytes 65536
-   :kafka/commit-interval 2000
    :kafka/wrap-with-metadata? false
    :kafka/unable-to-find-broker-backoff-ms 8000})
 
