@@ -12,6 +12,7 @@
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord]
            [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer]
+           [org.apache.kafka.common.record TimestampType]
            [org.apache.kafka.common TopicPartition]
            [org.apache.kafka.common.metrics Metrics]
            [org.apache.kafka.clients.producer Callback KafkaProducer ProducerRecord]))
@@ -204,7 +205,7 @@
                         :serialized-key-size (.serializedKeySize cr)
                         :serialized-value-size (.serializedValueSize cr)
                         :timestamp (.timestamp cr)
-                        :timestamp-type (.id (.timestampType cr))
+                        :timestamp-type (.id ^TimestampType (.timestampType cr))
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))
