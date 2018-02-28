@@ -204,6 +204,7 @@
                         :serialized-key-size (.serializedKeySize cr)
                         :serialized-value-size (.serializedValueSize cr)
                         :timestamp (.timestamp cr)
+                        :timestamp-type (.id (.timestampType cr))
                         :offset (.offset cr)})
                      (fn [^ConsumerRecord cr]
                        (deserializer-fn (.value cr))))
