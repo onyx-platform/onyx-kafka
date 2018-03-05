@@ -117,9 +117,7 @@
   (let [paused (into #{}
                      (map #(.partition %))
                      (.paused consumer))]
-    (taoensso.timbre/errorf "Partitions: %s Paused: %s" kpartitions paused)
     (= paused (set kpartitions))))
-
 
 (deftype KafkaReadMessages
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
