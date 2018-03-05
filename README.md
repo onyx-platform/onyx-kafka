@@ -164,6 +164,6 @@ Pull requests into the master branch are welcomed.
 
 #### License
 
-Copyright © 2015 Michael Drogalis
+Copyright © 2018 Distributed Masonry
 
 Distributed under the Eclipse Public License, the same as Clojure.
