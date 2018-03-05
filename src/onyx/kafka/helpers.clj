@@ -5,7 +5,7 @@
            [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRecord]
            [org.apache.kafka.clients.producer KafkaProducer Callback ProducerRecord]
            [org.apache.kafka.common.serialization ByteArrayDeserializer ByteArraySerializer Serializer Deserializer]
-           [org.apache.kafka.common TopicPartition]
+           [org.apache.kafka.common TopicPartition PartitionInfo]
            [kafka.admin AdminUtils]
            [kafka.utils ZKStringSerializer$]
            [org.I0Itec.zkclient ZkClient ZkConnection IZkConnection]
@@ -163,3 +163,22 @@
         record (ProducerRecord. topic part k v)]
     (.send producer record (->ProducerCallback p))
     @p))
+
+(defn partition-info->topic-partition [topic ^PartitionInfo part-info]
+  (TopicPartition. topic (.partition part-info)))
+
+(defn end-offsets [bootstrap-servers topic]
+  (let [opts {"bootstrap.servers" bootstrap-servers}
+        k-deser (ByteArrayDeserializer.)
+        v-deser (ByteArrayDeserializer.)]
+    (with-open [consumer (build-consumer opts k-deser v-deser)]
+      (let [parts (.partitionsFor consumer topic)
+            tps (map (partial partition-info->topic-partition topic) parts)]
+        (.endOffsets consumer tps)))))
+
+(defn end-offsets->clj [end-offsets]
+  (reduce-kv
+   (fn [all ^TopicPartition k v]
+     (assoc all (.partition k) v))
+   {}
+   (into {} end-offsets)))
