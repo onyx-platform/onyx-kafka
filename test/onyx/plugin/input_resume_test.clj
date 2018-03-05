@@ -13,7 +13,7 @@
              [core-async :as core-async]]))
 
 (defn build-job [zk-address topic batch-size batch-timeout]
-  (let [batch-settings {:onyx/batch-size batch-size 
+  (let [batch-settings {:onyx/batch-size batch-size
                         :onyx/batch-timeout batch-timeout}
         base-job (merge {:workflow [[:read-messages :identity]
                                     [:identity :out]]
@@ -68,8 +68,8 @@
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)
         tenancy-id (str (java.util.UUID/randomUUID))
         env-config (assoc env-config :onyx/tenancy-id tenancy-id)
-        peer-config (assoc peer-config 
-                           :onyx/tenancy-id tenancy-id 
+        peer-config (assoc peer-config
+                           :onyx/tenancy-id tenancy-id
                            ;; should be much lower to get some checkpointing in
                            :onyx.peer/coordinator-barrier-period-ms 1)
         zk-address (get-in peer-config [:zookeeper/address])
@@ -78,10 +78,10 @@
       (with-test-env [test-env [4 env-config peer-config]]
         (onyx.test-helper/validate-enough-peers! test-env job)
         (test-utils/write-data test-topic zk-address (:kafka-bootstrap test-config) test-data)
-        (->> job 
+        (->> job
              (onyx.api/submit-job peer-config)
              :job-id
              (onyx.test-helper/feedback-exception! peer-config))
         (Thread/sleep 1000)
-        (let [{:keys [out]} (get-core-async-channels job)] 
+        (let [{:keys [out]} (get-core-async-channels job)]
           (is (= (set (butlast test-data)) (set @test-state)))))))

@@ -97,6 +97,11 @@
              :kafka/start-offsets
              {:doc "Allows a task to be supplied with the starting offsets for all partitions. Maps partition to offset, e.g. `{0 50, 1, 90}` will start at offset 50 for partition 0, and offset 90 for partition 1."
               :type :map
+              :optional? true}
+
+             :kafka/target-offsets
+             {:doc "Allows a task to be supplied with target offsets for all partitions. Maps partition to target offset, e.g. `{0 50, 1 90}` and will cause the plugin to stop consuming records after reaching the specified offsets."
+              :type :map
               :optional? true}}}
 
     :onyx.plugin.kafka/write-messages
@@ -172,6 +177,7 @@
      :kafka/commit-interval
      :kafka/wrap-with-metadata?
      :kafka/start-offsets
+     :kafka/target-offsets
      :kafka/consumer-opts
      :kafka/empty-read-back-off
      :kafka/fetch-size
