@@ -1,4 +1,4 @@
-(ns onyx.plugin.target-offset-test
+(ns onyx.plugin.target-offsets-test
   (:require [clojure.test :refer [deftest is testing]]
             [com.stuartsierra.component :as component]
             [onyx.kafka.helpers :as h]
@@ -36,10 +36,10 @@
                                     :onyx/min-peers n-partitions
                                     :onyx/max-peers n-partitions
                                     :kafka/wrap-with-metadata? true
-                                    :kafka/target-offset {0 20
-                                                          1 25
-                                                          2 30
-                                                          3 35}}
+                                    :kafka/target-offsets {0 20
+                                                           1 25
+                                                           2 30
+                                                           3 35}}
                                    batch-settings)))
         (add-task (core-async/output :out batch-settings)))))
 
@@ -59,7 +59,7 @@
         (doseq [x (range 180)] ;3 4 5
           (h/send-sync! producer2 topic nil nil (.getBytes (pr-str {:n (+ 3 (long x))}))))))))
 
-(deftest kafka-target-offset-test
+(deftest kafka-target-offsets-test
   (let [test-topic (str (java.util.UUID/randomUUID))
         _ (println "Using topic" test-topic)
         {:keys [test-config env-config peer-config]} (onyx.plugin.test-utils/read-config)

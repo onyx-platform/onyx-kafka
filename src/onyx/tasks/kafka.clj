@@ -31,7 +31,7 @@
    (s/optional-key :kafka/receive-buffer-bytes) s/Int
    (s/optional-key :kafka/partition) (s/cond-pre s/Int s/Str)
    (s/optional-key :kafka/wrap-with-metadata?) s/Bool
-   (s/optional-key :kafka/target-offset) {s/Int s/Int}
+   (s/optional-key :kafka/target-offsets) {s/Int s/Int}
    (os/restricted-ns :kafka) s/Any})
 
 (s/defn ^:always-validate consumer

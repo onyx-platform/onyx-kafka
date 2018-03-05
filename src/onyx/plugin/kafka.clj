@@ -112,14 +112,6 @@
                 0
                 (.endOffsets consumer (.assignment consumer)))))
 
-(defn pause-partitions-over-target-offset
-  [^KafkaConsumer consumer topic partition->offset targets]
-  (doseq [[partition target-offset] targets]
-    (let [current-offset (get partition->offset partition 0)]
-      (when (>= current-offset target-offset)
-        (let [topic-partition (TopicPartition. topic partition)]
-          (.pause consumer [topic-partition]))))))
-
 (defn all-partitions-paused?
   [^KafkaConsumer consumer kpartitions]
   (let [paused (into #{}
@@ -220,7 +212,7 @@
             nil)))))
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
-  (let [{:keys [kafka/topic kafka/deserializer-fn kafka/target-offset]} task-map
+  (let [{:keys [kafka/topic kafka/deserializer-fn kafka/target-offsets]} task-map
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
         deserializer-fn (kw->fn (:kafka/deserializer-fn task-map))
@@ -241,7 +233,7 @@
         {:keys [lag-gauge]} monitoring]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
                          deserializer-fn segment-fn watermark lag-gauge
-                         nil nil nil false target-offset)))
+                         nil nil nil false target-offsets)))
 
 (defn close-read-messages
   [event lifecycle]
