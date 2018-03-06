@@ -57,6 +57,11 @@
               :type :map
               :optional? true}
 
+             :kafka/consumer-constructor
+             {:doc "The name of a fully qualified class to use to construct the consumer, instead of the default KafkaConsumer implementation."
+              :type :string
+              :optional? true}
+
              :kafka/fetch-size
              {:doc "The size in bytes to request from ZooKeeper per fetch request."
               :type :long
@@ -181,7 +186,8 @@
      :kafka/consumer-opts
      :kafka/empty-read-back-off
      :kafka/fetch-size
-     :kafka/chan-capacity]
+     :kafka/chan-capacity
+     :kafka/consumer-constructor]
 
     :onyx.plugin.kafka/write-messages
     [:kafka/topic

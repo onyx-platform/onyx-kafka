@@ -36,6 +36,7 @@
                                     :onyx/min-peers n-partitions
                                     :onyx/max-peers n-partitions
                                     :kafka/wrap-with-metadata? true
+                                    :kafka/consumer-constructor "org.apache.kafka.clients.consumer.KafkaConsumer"
                                     :kafka/target-offsets {0 20
                                                            1 25
                                                            2 30

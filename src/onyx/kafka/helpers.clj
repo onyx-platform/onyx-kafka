@@ -2,8 +2,8 @@
   (:require [clojure.string :as string]
             [taoensso.timbre :as log])
   (:import [kafka.utils ZkUtils]
-           [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRecord]
-           [org.apache.kafka.clients.producer KafkaProducer Callback ProducerRecord]
+           [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRecord Consumer]
+           [org.apache.kafka.clients.producer KafkaProducer Producer Callback ProducerRecord]
            [org.apache.kafka.common.serialization ByteArrayDeserializer ByteArraySerializer Serializer Deserializer]
            [org.apache.kafka.common TopicPartition PartitionInfo]
            [kafka.admin AdminUtils]
@@ -85,18 +85,30 @@
 (defn byte-array-deserializer []
   (ByteArrayDeserializer.))
 
-(defn ^KafkaProducer build-producer [producer-opts key-serializer value-serializer]
+(defn ^Producer build-producer [producer-opts key-serializer value-serializer]
   (KafkaProducer. ^Properties (as-properties (as-java producer-opts))
                   ^Serializer key-serializer
                   ^Serializer value-serializer))
 
-(defn ^KafkaConsumer build-consumer [consumer-opts key-deserializer value-deserializer]
-  (KafkaConsumer. ^Properties (as-properties (as-java consumer-opts))
-                  ^Deserializer key-deserializer
-                  ^Deserializer value-deserializer))
+(defn reflectively-build-comsumer
+  [clz ^Properties props ^Deserializer key-deserializer ^Deserializer value-deserializer]
+  (.newInstance (.getConstructor (Class/forName clz)
+                                 (into-array Class [Properties Deserializer Deserializer]))
+                (into-array Object [props key-deserializer value-deserializer])))
+
+(defn ^Consumer build-consumer
+  ([consumer-opts key-deserializer value-deserializer]
+   (build-consumer consumer-opts key-deserializer value-deserializer nil))
+  ([consumer-opts key-deserializer value-deserializer ctor]
+   (let [props (as-properties (as-java consumer-opts))]
+     (if (nil? ctor)
+       (KafkaConsumer. ^Properties props
+                       ^Deserializer key-deserializer
+                       ^Deserializer value-deserializer)
+       (reflectively-build-comsumer ctor props key-deserializer value-deserializer)))))
 
 (defn partitions-for-topic [consumer topic]
-  (let [parts (.partitionsFor ^KafkaConsumer consumer topic)]
+  (let [parts (.partitionsFor ^Consumer consumer topic)]
     (map
      (fn [part]
        {:topic (.topic part)
@@ -109,19 +121,19 @@
 (defn assign-partitions! [consumer topic-partitions]
   (->> topic-partitions
        (mapv to-topic-partition)
-       (.assign ^KafkaConsumer consumer)))
+       (.assign ^Consumer consumer)))
 
 (defn seek-to-offset! [consumer topic-partition offset]
   (let [encoded (to-topic-partition topic-partition)]
-    (.seek ^KafkaConsumer consumer encoded offset)))
+    (.seek ^Consumer consumer encoded offset)))
 
 (defn seek-to-beginning! [consumer topic-partitions]
   (let [encoded (map to-topic-partition topic-partitions)]
-    (.seekToBeginning ^KafkaConsumer consumer encoded)))
+    (.seekToBeginning ^Consumer consumer encoded)))
 
 (defn seek-to-end! [consumer topic-partitions]
   (let [encoded (map to-topic-partition topic-partitions)]
-    (.seekToEnd ^KafkaConsumer consumer encoded)))
+    (.seekToEnd ^Consumer consumer encoded)))
 
 (defn consumer-record->message
   [decompress-fn ^ConsumerRecord m]
@@ -132,7 +144,7 @@
    :timestamp (.timestamp m)})
 
 (defn poll! [consumer timeout]
-  (.poll ^KafkaConsumer consumer timeout))
+  (.poll ^Consumer consumer timeout))
 
 (defn take-now
   "Reads whatever it can from a topic on the assumption that we've distributed
@@ -158,7 +170,7 @@
   (onCompletion [_ v exception]
     (deliver p true)))
 
-(defn send-sync! [producer topic part k v]
+(defn send-sync! [^Producer producer topic part k v]
   (let [p (promise)
         record (ProducerRecord. topic part k v)]
     (.send producer record (->ProducerCallback p))

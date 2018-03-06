@@ -32,6 +32,7 @@
    (s/optional-key :kafka/partition) (s/cond-pre s/Int s/Str)
    (s/optional-key :kafka/wrap-with-metadata?) s/Bool
    (s/optional-key :kafka/target-offsets) {s/Int s/Int}
+   (s/optional-key :kafka/consumer-constructor) s/Str
    (os/restricted-ns :kafka) s/Any})
 
 (s/defn ^:always-validate consumer

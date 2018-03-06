@@ -15,7 +15,7 @@
            [org.apache.kafka.common.record TimestampType]
            [org.apache.kafka.common TopicPartition]
            [org.apache.kafka.common.metrics Metrics]
-           [org.apache.kafka.clients.producer Callback KafkaProducer ProducerRecord]))
+           [org.apache.kafka.clients.producer Callback KafkaProducer Producer ProducerRecord]))
 
 (def defaults
   {:kafka/receive-buffer-bytes 65536
@@ -108,7 +108,7 @@
       (h/assign-partitions! consumer* parts)
       parts-range)))
 
-(defn set-lag! [^AtomicLong lag-gauge ^KafkaConsumer consumer]
+(defn set-lag! [^AtomicLong lag-gauge ^Consumer consumer]
   (.set lag-gauge
         (reduce (fn [lag [tp offset]]
                   (+ lag (- offset (.position consumer tp))))
@@ -116,13 +116,13 @@
                 (.endOffsets consumer (.assignment consumer)))))
 
 (defn all-partitions-paused?
-  [^KafkaConsumer consumer kpartitions]
+  [^Consumer consumer kpartitions]
   (let [paused (into #{}
                      (map #(.partition ^TopicPartition %))
                      (.paused consumer))]
     (= paused (set kpartitions))))
 
-(defn paused? [^KafkaConsumer consumer part]
+(defn paused? [^Consumer consumer part]
   (let [paused (into #{}
                      (map #(.partition ^TopicPartition %))
                      (.paused consumer))]
@@ -130,7 +130,7 @@
 
 (deftype KafkaReadMessages
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
-     deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^KafkaConsumer ^:unsynchronized-mutable consumer
+     deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^Consumer ^:unsynchronized-mutable consumer
      ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained
      target-offsets]
   PluginMeta
@@ -152,7 +152,7 @@
      :partition->offset partition->offset})
   p/Plugin
   (start [this event]
-    (let [{:keys [kafka/bootstrap-servers kafka/group-id kafka/consumer-opts]} task-map
+    (let [{:keys [kafka/bootstrap-servers kafka/group-id kafka/consumer-constructor kafka/consumer-opts]} task-map
           brokers (or bootstrap-servers (find-brokers task-map))
           _ (s/validate onyx.tasks.kafka/KafkaInputTaskMap task-map)
           consumer-config (merge {"bootstrap.servers" brokers
@@ -165,7 +165,7 @@
           _ (info log-prefix "Starting kafka/read-messages task with consumer opts:" consumer-config)
           key-deserializer (h/byte-array-deserializer)
           value-deserializer (h/byte-array-deserializer)
-          consumer* (h/build-consumer consumer-config key-deserializer value-deserializer)
+          consumer* (h/build-consumer consumer-config key-deserializer value-deserializer consumer-constructor)
           partitions (mapv :partition (h/partitions-for-topic consumer* topic))
           n-partitions (count partitions)]
       (check-num-peers-equals-partitions task-map n-partitions)
@@ -313,7 +313,7 @@
     this)
 
   (stop [this event]
-    (.close ^KafkaProducer producer)
+    (.close ^Producer producer)
     this)
 
   p/BarrierSynchronization
@@ -346,7 +346,7 @@
                   (into (map
                          (fn [msg]
                            (let [record (message->producer-record key-serializer-fn serializer-fn topic kpartition msg)]
-                             (.send ^KafkaProducer producer record write-callback)))
+                             (.send ^Producer producer record write-callback)))
                          write-batch)))))
     true))
 

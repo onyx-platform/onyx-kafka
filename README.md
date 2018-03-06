@@ -70,6 +70,7 @@ Lifecycle entry:
 |`:kafka/start-offsets`       | `map`     |         | Allows a task to be supplied with the starting offsets for all partitions. Maps partition to offset, e.g. `{0 50, 1, 90}` will start at offset 50 for partition 0, and offset 90 for partition 1
 |`:kafka/target-offsets`      | `map`     |         | Allows a task to be supplied with target offsets for all partitions. Maps partition to target offset, e.g. `{0 50, 1 90}` and will cause the plugin to stop consuming records after reaching the specified offsets.
 |`:kafka/consumer-opts`       | `map`     |         | A map of arbitrary configuration to merge into the underlying Kafka consumer base configuration. Map should contain strings as keys, and the valid values described in the [Kafka Docs](http://kafka.apache.org/documentation.html#newconsumerconfigs).
+|`:kafka/consumer-constructor`| `string`  |         | The name of a fully qualified class to use to construct the consumer, instead of the default KafkaConsumer implementation.
 
 ##### write-messages
 
