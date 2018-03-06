@@ -131,13 +131,13 @@
   (metadata [this]
     {:consumer consumer 
      :beginning-offsets (into {} 
-                              (map (fn [[topic-partition offset]]
+                              (map (fn [[^TopicPartition topic-partition offset]]
                                      [{:topic (.topic topic-partition)
                                        :partition (.partition topic-partition)}
                                       offset]) 
                                    (.beginningOffsets consumer (.assignment consumer))))
      :end-offsets (into {} 
-                        (map (fn [[topic-partition offset]]
+                        (map (fn [[^TopicPartition topic-partition offset]]
                                [{:topic (.topic topic-partition)
                                  :partition (.partition topic-partition)}
                                 offset]) 
