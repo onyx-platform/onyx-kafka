@@ -118,7 +118,7 @@
 (defn all-partitions-paused?
   [^KafkaConsumer consumer kpartitions]
   (let [paused (into #{}
-                     (map #(.partition ^org.apache.kafka.common.PartitionInfo %))
+                     (map #(.partition ^TopicPartition %))
                      (.paused consumer))]
     (= paused (set kpartitions))))
 
