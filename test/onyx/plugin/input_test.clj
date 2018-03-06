@@ -66,7 +66,7 @@
         (write-data test-topic zk-address (:kafka-bootstrap test-config))
         (let [job-id (:job-id (onyx.api/submit-job peer-config job))]
           (let [results (onyx.plugin.core-async/take-segments! out 10000)] 
-            (println "RESULTS" results)
+            (println "Result" results)
             (is (= 15 (reduce + (mapv :n results)))))
           (println "Done taking segments")
           (onyx.api/kill-job peer-config job-id)))))
