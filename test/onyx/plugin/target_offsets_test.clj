@@ -78,10 +78,10 @@
                                                      (map (fn [[k v]]
                                                             [k (count v)]))
                                                      (group-by :partition first-results))]
-                       (testing "We get the exact ammount of records requested"
-                         (is (= (get partition-count-map 0) 20))
-                         (is (= (get partition-count-map 1) 25))
-                         (is (= (get partition-count-map 2) 30))
-                         (is (= (get partition-count-map 3) 35))))
+                       (testing "We get the exact ammount of records requested, plus the final markers."
+                         (is (= (get partition-count-map 0) 21))
+                         (is (= (get partition-count-map 1) 26))
+                         (is (= (get partition-count-map 2) 31))
+                         (is (= (get partition-count-map 3) 36))))
                      (println "Done taking segments")
                      (onyx.api/kill-job peer-config job-id)))))
