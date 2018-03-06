@@ -69,6 +69,9 @@
                         {:recoverable? true
                          :zk-addr zk-addr}))))))
 
+(defprotocol PluginMeta
+  (metadata [this]))
+
 (defn start-kafka-consumer
   [event lifecycle]
   {})
@@ -115,15 +118,32 @@
 (defn all-partitions-paused?
   [^KafkaConsumer consumer kpartitions]
   (let [paused (into #{}
-                     (map #(.partition %))
+                     (map #(.partition ^org.apache.kafka.common.PartitionInfo %))
                      (.paused consumer))]
     (= paused (set kpartitions))))
 
 (deftype KafkaReadMessages
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
-     deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^:unsynchronized-mutable consumer
+     deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^KafkaConsumer ^:unsynchronized-mutable consumer
      ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained
      target-offsets]
+  PluginMeta
+  (metadata [this]
+    {:consumer consumer 
+     :beginning-offsets (into {} 
+                              (map (fn [[topic-partition offset]]
+                                     [{:topic (.topic topic-partition)
+                                       :partition (.partition topic-partition)}
+                                      offset]) 
+                                   (.beginningOffsets consumer (.assignment consumer))))
+     :end-offsets (into {} 
+                        (map (fn [[topic-partition offset]]
+                               [{:topic (.topic topic-partition)
+                                 :partition (.partition topic-partition)}
+                                offset]) 
+                             (.endOffsets consumer (.assignment consumer))))
+     :partitions kpartitions 
+     :partition->offset partition->offset})
   p/Plugin
   (start [this event]
     (let [{:keys [kafka/bootstrap-servers kafka/group-id kafka/consumer-opts]} task-map
@@ -150,7 +170,7 @@
 
   (stop [this event]
     (when consumer
-      (.close ^KafkaConsumer consumer)
+      (.close consumer)
       (set! consumer nil))
     this)
 
@@ -189,7 +209,8 @@
         (.set watermark (max (.get watermark) (.timestamp rec)))
 
         (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
-              (do (set! drained true) nil)
+              (do (set! drained true) 
+                  nil)
 
               deserialized
               (let [new-offset (.offset rec)
