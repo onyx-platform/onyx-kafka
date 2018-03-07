@@ -123,9 +123,8 @@
     (= paused (set kpartitions))))
 
 (defn paused? [^KafkaConsumer consumer part]
-  (let [paused (into #{}
-                     (map #(.partition ^TopicPartition %))
-                     (.paused consumer))]
+  (let [paused (map #(.partition ^TopicPartition %)
+                    (.paused consumer))]
     (some #{part} paused)))
 
 (deftype KafkaReadMessages
@@ -226,16 +225,13 @@
                 (if target-offset
                   (let [tp (TopicPartition. topic part)
                         part-paused? (paused? consumer part)]
-                    (cond (and (>= new-offset target-offset)
-                               (not part-paused?))
-                          (do
-                            (.pause consumer [tp])
+                    (if (>= new-offset target-offset)
+                      (if (not part-paused?)
+                        (do (.pause consumer [tp])
                             (when (all-partitions-paused? consumer kpartitions)
                               (set! drained true))
-                            {:type :end-reached :partition part})
-
-                          (not part-paused?)
-                          deserialized))
+                            {:type :end-reached :partition part}))
+                      deserialized))
                   deserialized))))
       (when-not drained
         (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
