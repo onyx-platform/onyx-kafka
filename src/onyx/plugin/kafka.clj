@@ -200,17 +200,17 @@
                          [p (if drained? :emitted :reading)]))
                      kpartitions))
           resuming-tps (reduce-kv
-                        (fn [all k v]
+                        (fn [all part v]
                           (if (not (some #{v} #{:emitted :drained}))
-                            (conj all (TopicPartition. topic v))
+                            (conj all (TopicPartition. topic part))
                             all))
                         []
                         partition-statuses)]
       (.resume consumer resuming-tps)
-      (reset! drained partition-statuses))
-    (set! iter nil)
-    (set! partition->offset checkpoint)
-    (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint)
+      (reset! drained partition-statuses)
+      (set! iter nil)
+      (set! partition->offset checkpoint)
+      (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint))
     this)
 
   (checkpointed! [this epoch])
@@ -218,7 +218,7 @@
   p/BarrierSynchronization
   (synced? [this epoch]
     (set-lag! lag-gauge consumer)
-    true)
+    (empty? (filter (fn [[_ state]] (= state :drained)) @drained)))
 
   (completed? [this]
     (empty? (filter #(not= :emitted %) (vals @drained))))
