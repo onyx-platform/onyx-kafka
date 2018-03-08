@@ -234,16 +234,17 @@
                {:type :end-reached :partition drained-part})
 
               deserialized
-              (let [new-offset (.offset rec)
-                    target-offset (get target-offsets part)]
+              (let [new-offset (.offset rec)]
                 (set! partition->offset (assoc partition->offset part new-offset))
-                (if target-offset
+                (if-let [target-offset (get target-offsets part)]
                   (let [tp (TopicPartition. topic part)]
                     (if (>= new-offset target-offset)
-                      (if (not (paused? consumer part))
-                        (do (.pause consumer [tp])
-                            (swap! drained assoc (.partition rec) :drained)
-                            deserialized))
+                      (when (not (paused? consumer part))
+                        (.pause consumer [tp])
+                        (swap! drained assoc (.partition rec) :drained)
+                        ;; only emit message if it's on the boundary
+                        (if (= new-offset target-offset) 
+                          deserialized))
                       deserialized))
                   deserialized))))
       (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
