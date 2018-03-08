@@ -130,7 +130,7 @@
 (deftype KafkaReadMessages
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
      deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^KafkaConsumer ^:unsynchronized-mutable consumer
-     ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained
+     ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset drained
      target-offsets]
   PluginMeta
   (metadata [this]
@@ -189,10 +189,19 @@
     partition->offset)
   ;;  checkpoint map looks like {part offset}
   (recover! [this replica-version checkpoint]
-    (set! drained false)
+    ;; FIXME, only resume the partitions that aren't :emit below
+    (.resume consumer (.assignment consumer))
+    (reset! drained (into {} 
+                          (map (fn [p] 
+                                 (let [current-offset (get checkpoint p)
+                                       target-offset (get target-offsets p)
+                                       drained? (and current-offset 
+                                                     target-offset
+                                                     (>= current-offset target-offset))] 
+                                   [p (if drained? :emitted :reading)]))
+                               kpartitions)))
     (set! iter nil)
     (set! partition->offset checkpoint)
-    (.resume consumer (.assignment consumer))
     (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint)
     this)
 
@@ -204,38 +213,41 @@
     true)
 
   (completed? [this]
-    drained)
+    (empty? (filter #(not= :emitted %) (vals @drained))))
 
   p/Input
   (poll! [this _ remaining-ms]
     (if (and iter (.hasNext ^java.util.Iterator iter))
       (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
-            deserialized (some-> rec segment-fn)]
+            deserialized (some-> rec segment-fn)
+            part (.partition rec)
+            drained-part (ffirst (filter (fn [[_ state]] (= state :drained)) @drained))]
         (.set watermark (max (.get watermark) (.timestamp rec)))
 
         (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
-              (do (set! drained true) 
+              (do (swap! drained assoc (.partition rec) :emitted)
                   nil)
+
+              drained-part
+              (do
+               (swap! drained assoc drained-part :emitted)
+               {:type :end-reached :partition drained-part})
 
               deserialized
               (let [new-offset (.offset rec)
-                    part (.partition rec)
                     target-offset (get target-offsets part)]
                 (set! partition->offset (assoc partition->offset part new-offset))
                 (if target-offset
-                  (let [tp (TopicPartition. topic part)
-                        part-paused? (paused? consumer part)]
+                  (let [tp (TopicPartition. topic part)]
                     (if (>= new-offset target-offset)
-                      (if (not part-paused?)
+                      (if (not (paused? consumer part))
                         (do (.pause consumer [tp])
-                            (when (all-partitions-paused? consumer kpartitions)
-                              (set! drained true))
-                            {:type :end-reached :partition part}))
+                            (swap! drained assoc (.partition rec) :drained)
+                            deserialized))
                       deserialized))
                   deserialized))))
-      (when-not drained
-        (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
-            nil)))))
+      (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
+          nil))))
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
   (let [{:keys [kafka/topic kafka/deserializer-fn kafka/target-offsets]} task-map
@@ -260,7 +272,7 @@
         {:keys [lag-gauge]} monitoring]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
                          deserializer-fn segment-fn watermark lag-gauge
-                         nil nil nil false target-offsets)))
+                         nil nil nil (atom {}) target-offsets)))
 
 (defn close-read-messages
   [event lifecycle]
