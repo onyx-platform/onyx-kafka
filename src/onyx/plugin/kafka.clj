@@ -217,38 +217,35 @@
 
   p/Input
   (poll! [this _ remaining-ms]
-    (if (and iter (.hasNext ^java.util.Iterator iter))
-      (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
-            deserialized (some-> rec segment-fn)
-            part (.partition rec)
-            drained-part (ffirst (filter (fn [[_ state]] (= state :drained)) @drained))]
-        (.set watermark (max (.get watermark) (.timestamp rec)))
+    (if-let [drained-part (ffirst (filter (fn [[_ state]] (= state :drained)) @drained))]
+      (do (swap! drained assoc drained-part :emitted)
+          {:type :end-reached :partition drained-part})
+      (if (and iter (.hasNext ^java.util.Iterator iter))
+        (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
+              deserialized (some-> rec segment-fn)
+              part (.partition rec)]
+          (.set watermark (max (.get watermark) (.timestamp rec)))
 
-        (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
-              (do (swap! drained assoc (.partition rec) :emitted)
-                  nil)
+          (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
+                (do (swap! drained assoc (.partition rec) :emitted)
+                    nil)
 
-              drained-part
-              (do
-               (swap! drained assoc drained-part :emitted)
-               {:type :end-reached :partition drained-part})
-
-              deserialized
-              (let [new-offset (.offset rec)]
-                (set! partition->offset (assoc partition->offset part new-offset))
-                (if-let [target-offset (get target-offsets part)]
-                  (let [tp (TopicPartition. topic part)]
-                    (if (>= new-offset target-offset)
-                      (when (not (paused? consumer part))
-                        (.pause consumer [tp])
-                        (swap! drained assoc (.partition rec) :drained)
-                        ;; only emit message if it's on the boundary
-                        (if (= new-offset target-offset) 
-                          deserialized))
-                      deserialized))
-                  deserialized))))
-      (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
-          nil))))
+                deserialized
+                (let [new-offset (.offset rec)]
+                  (set! partition->offset (assoc partition->offset part new-offset))
+                  (if-let [target-offset (get target-offsets part)]
+                    (let [tp (TopicPartition. topic part)]
+                      (if (>= new-offset target-offset)
+                        (when (not (paused? consumer part))
+                          (.pause consumer [tp])
+                          (swap! drained assoc (.partition rec) :drained)
+                          ;; only emit message if it's on the boundary
+                          (if (= new-offset target-offset) 
+                            deserialized))
+                        deserialized))
+                    deserialized))))
+        (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
+            nil))))) 
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
   (let [{:keys [kafka/topic kafka/deserializer-fn kafka/target-offsets]} task-map
