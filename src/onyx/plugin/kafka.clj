@@ -130,7 +130,7 @@
 (deftype KafkaReadMessages
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
      deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^KafkaConsumer ^:unsynchronized-mutable consumer
-     ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset ^:unsynchronized-mutable drained
+     ^:unsynchronized-mutable iter ^:unsynchronized-mutable partition->offset drained
      target-offsets]
   PluginMeta
   (metadata [this]
@@ -189,11 +189,28 @@
     partition->offset)
   ;;  checkpoint map looks like {part offset}
   (recover! [this replica-version checkpoint]
-    (set! drained false)
-    (set! iter nil)
-    (set! partition->offset checkpoint)
-    (.resume consumer (.assignment consumer))
-    (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint)
+    (let [partition-statuses
+          (into {} 
+                (map (fn [p] 
+                       (let [current-offset (get checkpoint p)
+                             target-offset (get target-offsets p)
+                             drained? (and current-offset 
+                                           target-offset
+                                           (>= current-offset target-offset))] 
+                         [p (if drained? :emitted :reading)]))
+                     kpartitions))
+          resuming-tps (reduce-kv
+                        (fn [all part v]
+                          (if (not (some #{v} #{:emitted :drained}))
+                            (conj all (TopicPartition. topic part))
+                            all))
+                        []
+                        partition-statuses)]
+      (.resume consumer resuming-tps)
+      (reset! drained partition-statuses)
+      (set! iter nil)
+      (set! partition->offset checkpoint)
+      (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint))
     this)
 
   (checkpointed! [this epoch])
@@ -201,41 +218,42 @@
   p/BarrierSynchronization
   (synced? [this epoch]
     (set-lag! lag-gauge consumer)
-    true)
+    (empty? (filter (fn [[_ state]] (= state :drained)) @drained)))
 
   (completed? [this]
-    drained)
+    (empty? (filter #(not= :emitted %) (vals @drained))))
 
   p/Input
   (poll! [this _ remaining-ms]
-    (if (and iter (.hasNext ^java.util.Iterator iter))
-      (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
-            deserialized (some-> rec segment-fn)]
-        (.set watermark (max (.get watermark) (.timestamp rec)))
+    (if-let [drained-part (ffirst (filter (fn [[_ state]] (= state :drained)) @drained))]
+      (do (swap! drained assoc drained-part :emitted)
+          {:type :end-reached :partition drained-part})
+      (if (and iter (.hasNext ^java.util.Iterator iter))
+        (let [rec ^ConsumerRecord (.next ^java.util.Iterator iter)
+              deserialized (some-> rec segment-fn)
+              part (.partition rec)]
+          (.set watermark (max (.get watermark) (.timestamp rec)))
 
-        (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
-              (do (set! drained true) 
-                  nil)
+          (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
+                (do (swap! drained assoc (.partition rec) :emitted)
+                    nil)
 
-              deserialized
-              (let [new-offset (.offset rec)
-                    part (.partition rec)
-                    target-offset (get target-offsets part)]
-                (set! partition->offset (assoc partition->offset part new-offset))
-                (if target-offset
-                  (let [tp (TopicPartition. topic part)
-                        part-paused? (paused? consumer part)]
-                    (if (>= new-offset target-offset)
-                      (if (not part-paused?)
-                        (do (.pause consumer [tp])
-                            (when (all-partitions-paused? consumer kpartitions)
-                              (set! drained true))
-                            {:type :end-reached :partition part}))
-                      deserialized))
-                  deserialized))))
-      (when-not drained
+                deserialized
+                (let [new-offset (.offset rec)]
+                  (set! partition->offset (assoc partition->offset part new-offset))
+                  (if-let [target-offset (get target-offsets part)]
+                    (let [tp (TopicPartition. topic part)]
+                      (if (>= new-offset target-offset)
+                        (when (not (paused? consumer part))
+                          (.pause consumer [tp])
+                          (swap! drained assoc (.partition rec) :drained)
+                          ;; only emit message if it's on the boundary
+                          (if (= new-offset target-offset) 
+                            deserialized))
+                        deserialized))
+                    deserialized))))
         (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
-            nil)))))
+            nil))))) 
 
 (defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
   (let [{:keys [kafka/topic kafka/deserializer-fn kafka/target-offsets]} task-map
@@ -260,7 +278,7 @@
         {:keys [lag-gauge]} monitoring]
     (->KafkaReadMessages log-prefix task-map topic nil batch-timeout
                          deserializer-fn segment-fn watermark lag-gauge
-                         nil nil nil false target-offsets)))
+                         nil nil nil (atom {}) target-offsets)))
 
 (defn close-read-messages
   [event lifecycle]

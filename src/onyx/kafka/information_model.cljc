@@ -100,7 +100,7 @@
               :optional? true}
 
              :kafka/target-offsets
-             {:doc "Allows a task to be supplied with target offsets for all partitions. Maps partition to target offset, e.g. `{0 50, 1 90}` and will cause the plugin to stop consuming records after reaching the specified offsets."
+             {:doc "Allows a task to be supplied with target offsets for all partitions. The consumer will read up to and including the target offset for each partition."
               :type :map
               :optional? true}}}
 
