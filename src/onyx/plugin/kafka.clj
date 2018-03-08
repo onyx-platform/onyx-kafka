@@ -189,17 +189,25 @@
     partition->offset)
   ;;  checkpoint map looks like {part offset}
   (recover! [this replica-version checkpoint]
-    ;; FIXME, only resume the partitions that aren't :emit below
-    (.resume consumer (.assignment consumer))
-    (reset! drained (into {} 
-                          (map (fn [p] 
-                                 (let [current-offset (get checkpoint p)
-                                       target-offset (get target-offsets p)
-                                       drained? (and current-offset 
-                                                     target-offset
-                                                     (>= current-offset target-offset))] 
-                                   [p (if drained? :emitted :reading)]))
-                               kpartitions)))
+    (let [partition-statuses
+          (into {} 
+                (map (fn [p] 
+                       (let [current-offset (get checkpoint p)
+                             target-offset (get target-offsets p)
+                             drained? (and current-offset 
+                                           target-offset
+                                           (>= current-offset target-offset))] 
+                         [p (if drained? :emitted :reading)]))
+                     kpartitions))
+          resuming-tps (reduce-kv
+                        (fn [all k v]
+                          (if (not= v :emitted)
+                            (conj all (TopicPartition. topic v))
+                            all))
+                        []
+                        partition-statuses)]
+      (.resume consumer resuming-tps)
+      (reset! drained partition-statuses))
     (set! iter nil)
     (set! partition->offset checkpoint)
     (seek-offset! log-prefix consumer kpartitions task-map topic checkpoint)
