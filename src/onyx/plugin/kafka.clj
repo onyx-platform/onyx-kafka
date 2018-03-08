@@ -201,7 +201,7 @@
                      kpartitions))
           resuming-tps (reduce-kv
                         (fn [all k v]
-                          (if (not= v :emitted)
+                          (if (not (some #{v} #{:emitted :drained}))
                             (conj all (TopicPartition. topic v))
                             all))
                         []
