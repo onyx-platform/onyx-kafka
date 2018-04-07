@@ -148,12 +148,12 @@ To benchmark, start a real ZooKeeper instance (at 127.0.0.1:2181) and Kafka inst
 
 Write perf, single peer writer:
 ```
-TIMBRE_LOG_LEVEL=info lein test onyx.plugin.output-bench-test :benchmark
+TIMBRE_LOG_LEVEL=:info lein test onyx.plugin.output-bench-test :benchmark
 ```
 
 Read perf, single peer reader:
 ```
-TIMBRE_LOG_LEVEL=info lein test onyx.plugin.input-benchmark-test :benchmark
+TIMBRE_LOG_LEVEL=:info lein test onyx.plugin.input-benchmark-test :benchmark
 ```
 
 Past results are maintained in `dev-resources/benchmarking/results.txt`.
