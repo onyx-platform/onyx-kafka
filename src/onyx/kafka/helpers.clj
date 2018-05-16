@@ -176,6 +176,16 @@
             tps (map (partial partition-info->topic-partition topic) parts)]
         (.endOffsets consumer tps)))))
 
+(defn beginning-end-offsets [bootstrap-servers topic]
+  (let [opts {"bootstrap.servers" bootstrap-servers}
+        k-deser (ByteArrayDeserializer.)
+        v-deser (ByteArrayDeserializer.)]
+    (with-open [consumer (build-consumer opts k-deser v-deser)]
+      (let [parts (.partitionsFor consumer topic)
+            tps (map (partial partition-info->topic-partition topic) parts)]
+        [(.beginningOffsets consumer tps)
+         (.endOffsets consumer tps)]))))
+
 (defn end-offsets->clj [end-offsets]
   (reduce-kv
    (fn [all ^TopicPartition k v]
