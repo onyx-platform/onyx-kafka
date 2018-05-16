@@ -163,8 +163,15 @@
           key-deserializer (h/byte-array-deserializer)
           value-deserializer (h/byte-array-deserializer)
           consumer* (h/build-consumer consumer-config key-deserializer value-deserializer)
+          _ (when (and (:kafka/target-offsets task-map)
+                       (:kafka/start-offsets task-map)
+                       (not= (set (keys (:kafka/target-offsets task-map)))
+                             (set (keys (:kafka/start-offsets task-map)))))
+              (throw (ex-info "When :kafka/start-offsets and :kafka/target-offsets are both specified, they must both contain the same partitions." 
+                              task-map)))
           partitions (mapv :partition 
                            (or (keys (:kafka/target-offsets task-map))
+                               (keys (:kafka/start-offsets task-map))
                                (h/partitions-for-topic consumer* topic)))
           n-partitions (count partitions)]
       (check-num-peers-equals-partitions task-map n-partitions)
