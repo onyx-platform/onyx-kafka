@@ -1,14 +1,12 @@
 (ns onyx.plugin.kafka
-  (:require [onyx.compression.nippy :refer [zookeeper-compress zookeeper-decompress]]
-            [onyx.plugin.partition-assignment :refer [partitions-for-slot]]
+  (:require [onyx.plugin.partition-assignment :refer [partitions-for-slot]]
             [onyx.kafka.helpers :as h]
             [taoensso.timbre :as log :refer [fatal info]]
             [onyx.static.default-vals :refer [arg-or-default]]
             [onyx.plugin.protocols :as p]
             [onyx.static.util :refer [kw->fn]]
             [onyx.tasks.kafka]
-            [schema.core :as s]
-            [onyx.api])
+            [schema.core :as s])
   (:import [java.util.concurrent.atomic AtomicLong]
            [org.apache.kafka.clients.consumer ConsumerRecords ConsumerRecord]
            [org.apache.kafka.clients.consumer KafkaConsumer ConsumerRebalanceListener Consumer]
@@ -165,7 +163,9 @@
           key-deserializer (h/byte-array-deserializer)
           value-deserializer (h/byte-array-deserializer)
           consumer* (h/build-consumer consumer-config key-deserializer value-deserializer)
-          partitions (mapv :partition (h/partitions-for-topic consumer* topic))
+          partitions (mapv :partition 
+                           (or (keys (:kafka/target-offsets task-map))
+                               (h/partitions-for-topic consumer* topic)))
           n-partitions (count partitions)]
       (check-num-peers-equals-partitions task-map n-partitions)
       (let [kpartitions* (assign-partitions-to-slot! consumer* task-map topic n-partitions (:onyx.core/slot-id event))]
@@ -178,7 +178,6 @@
       (.close consumer)
       (set! consumer nil))
     this)
-
 
   p/WatermarkedInput
   (watermark [this]
@@ -234,7 +233,8 @@
               part (.partition rec)]
           (.set watermark (max (.get watermark) (.timestamp rec)))
 
-          (cond (= :done deserialized) ;; TODO: Remove this in favor of target-offsets
+          ;; TODO: remove support for :done in favor of target-offsets
+          (cond (= :done deserialized)
                 (do (swap! drained assoc (.partition rec) :emitted)
                     nil)
 
@@ -255,7 +255,7 @@
         (do (set! iter (.iterator ^ConsumerRecords (.poll ^Consumer consumer remaining-ms)))
             nil))))) 
 
-(defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring] :as event}]
+(defn read-messages [{:keys [onyx.core/task-map onyx.core/log-prefix onyx.core/monitoring]}]
   (let [{:keys [kafka/topic kafka/deserializer-fn kafka/target-offsets]} task-map
         batch-timeout (arg-or-default :onyx/batch-timeout task-map)
         wrap-message? (or (:kafka/wrap-with-metadata? task-map) (:kafka/wrap-with-metadata? defaults))
@@ -371,7 +371,7 @@
   (onCompletion [_ v exception]
     (when exception (reset! e exception))))
 
-(defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix] :as event}]
+(defn write-messages [{:keys [onyx.core/task-map onyx.core/log-prefix]}]
   (let [_ (s/validate onyx.tasks.kafka/KafkaOutputTaskMap task-map)
         brokers (or (:kafka/bootstrap-servers task-map) (find-brokers task-map))
         request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
