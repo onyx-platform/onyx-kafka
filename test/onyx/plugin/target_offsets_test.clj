@@ -9,7 +9,8 @@
             [onyx.plugin.core-async :refer [get-core-async-channels]]
             [onyx.plugin.test-utils :as test-utils]
             [onyx.plugin.kafka]
-            [onyx.api]))
+            [onyx.api])
+  (:import [org.apache.kafka.common.errors TopicExistsException]))
 
 (def n-partitions (long 4))
 
@@ -46,7 +47,7 @@
 (defn write-data
   [topic zookeeper bootstrap-servers]
   (try (h/create-topic! zookeeper topic n-partitions 1)
-       (catch org.apache.kafka.common.errors.TopicExistsException _
+       (catch TopicExistsException _
          (println "Topic exists")
          nil))
   (let [producer-config {"bootstrap.servers" bootstrap-servers}

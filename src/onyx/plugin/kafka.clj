@@ -125,6 +125,25 @@
                     (.paused consumer))]
     (some #{part} paused)))
 
+(defn current-partition-statuses [checkpoint consumer target-offsets kpartitions]
+  (if target-offsets
+    (let [beginning-offsets (into {} 
+                                  (map (fn [[^TopicPartition topic-partition offset]]
+                                         [(.partition topic-partition) offset]) 
+                                       (.beginningOffsets consumer (.assignment consumer))))] 
+      (->> kpartitions
+           (map (fn [p] 
+                  (let [current-offset (or (get checkpoint p) (get beginning-offsets p))
+                        _ (assert current-offset)
+                        target-offset (get target-offsets p)
+                        drained? (and target-offset
+                                      (>= current-offset target-offset))] 
+                    [p (if drained? :drained :reading)])))             
+           (into {})))
+    (->> kpartitions
+         (map (fn [p] [p :reading]))             
+         (into {}))))
+
 (deftype KafkaReadMessages
     [log-prefix task-map topic ^:unsynchronized-mutable kpartitions batch-timeout
      deserializer-fn segment-fn ^AtomicLong watermark ^AtomicLong lag-gauge ^KafkaConsumer ^:unsynchronized-mutable consumer
@@ -195,16 +214,7 @@
     partition->offset)
   ;;  checkpoint map looks like {part offset}
   (recover! [this replica-version checkpoint]
-    (let [partition-statuses
-          (into {} 
-                (map (fn [p] 
-                       (let [current-offset (get checkpoint p)
-                             target-offset (get target-offsets p)
-                             drained? (and current-offset 
-                                           target-offset
-                                           (>= current-offset target-offset))] 
-                         [p (if drained? :emitted :reading)]))
-                     kpartitions))
+    (let [partition-statuses (current-partition-statuses checkpoint consumer target-offsets kpartitions)
           resuming-tps (reduce-kv
                         (fn [all part v]
                           (if (not (some #{v} #{:emitted :drained}))
@@ -224,10 +234,10 @@
   p/BarrierSynchronization
   (synced? [this epoch]
     (set-lag! lag-gauge consumer)
-    (empty? (filter (fn [[_ state]] (= state :drained)) @drained)))
+    true)
 
   (completed? [this]
-    (empty? (filter #(not= :emitted %) (vals @drained))))
+    (empty? (remove #(= :emitted %) (vals @drained))))
 
   p/Input
   (poll! [this _ remaining-ms]
