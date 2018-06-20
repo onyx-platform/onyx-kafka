@@ -125,7 +125,7 @@
                     (.paused consumer))]
     (some #{part} paused)))
 
-(defn current-partition-statuses [checkpoint consumer target-offsets kpartitions]
+(defn current-partition-statuses [checkpoint ^KafkaConsumer consumer target-offsets kpartitions]
   (if target-offsets
     (let [beginning-offsets (into {} 
                                   (map (fn [[^TopicPartition topic-partition offset]]
