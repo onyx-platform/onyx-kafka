@@ -36,8 +36,4 @@
                                          "-XX:+UseG1GC"
                                          "-XX:-OmitStackTraceInFastThrow"
                                          "-Xmx2g"
-                                         "-Daeron.client.liveness.timeout=50000000000"
-                                         "-XX:+UnlockCommercialFeatures" 
-                                         "-XX:+FlightRecorder"
-                                         "-XX:+UnlockDiagnosticVMOptions"
-                                         "-XX:StartFlightRecording=duration=240s,filename=localrecording.jfr"]}})
+                                         "-Daeron.client.liveness.timeout=50000000000"]}})
