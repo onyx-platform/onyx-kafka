@@ -41,7 +41,7 @@ jobs:
 
       - run: 
           name: add lein voom
-          command: echo '{:user {:plugins [[lein-voom "0.1.0-20160311_203101-g259fbfc"]]}}' > ~/.lein/profiles.clj
+          command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20160311_203101-g259fbfc"]]}}' > ~/.lein/profiles.clj
 
       - run: 
           name: lein voom build deps
