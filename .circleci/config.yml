@@ -1,0 +1,48 @@
+version: 2
+executorType: docker
+jobs:
+  build:
+    docker:
+      - image: circleci/clojure:lein-2.8.1
+      - image: zookeeper:3.4.9
+        environment:
+          ZOO_MY_ID: 1
+          ZOO_PORT: 2181
+          ZOO_SERVERS: server.1=127.0.0.1:2888:3888
+      - image: confluentinc/cp-kafka:4.0.0
+        environment:
+          KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://127.0.0.1:9092"
+          KAFKA_ZOOKEEPER_CONNECT: "127.0.0.1:2181"
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+          KAFKA_OFFSET_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_BROKER_ID: 1
+          KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ .Branch }}-{{ .Revision }}
+
+      - run: 
+          name: add lein voom
+          command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
+
+      - run: 
+          name: lein voom build deps
+          command: lein voom build-deps
+
+      - run: 
+          name: test
+          command: lein test
+
+      - run:
+          name: lein deploy
+          command: lein deploy
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
