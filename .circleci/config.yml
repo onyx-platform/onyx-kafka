@@ -1,7 +1,7 @@
 version: 2
 executorType: docker
 jobs:
-  test:
+  build:
     docker:
       - image: circleci/clojure:lein-2.8.1
       # - image: zookeeper:3.4.9
