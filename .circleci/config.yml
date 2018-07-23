@@ -24,7 +24,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-          - v1-dependencies-{{ .Branch }}-{{ .Revision }}
+          - "{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ checksum \"project.clj\" }}"
       - run:
           name: add lein voom
           command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
@@ -37,7 +37,7 @@ jobs:
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
+          key: "{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ checksum \"project.clj\" }}"
   release:
     docker:
       - image: circleci/clojure:lein-2.8.1
@@ -46,7 +46,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-          - v1-dependencies-{{ .Branch }}-{{ .Revision }}
+          - "{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ checksum \"project.clj\" }}"
       - run:
           name: add lein voom
           command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
@@ -59,7 +59,7 @@ jobs:
       - save_cache:
           paths:
             - ~/.m2
-          key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
+          key: "{{ .Environment.CIRCLE_PROJECT_REPONAME }}-{{ checksum \"project.clj\" }}"
 
 workflows:
   version: 2
