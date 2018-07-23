@@ -1,7 +1,7 @@
 version: 2
 executorType: docker
 jobs:
-  build:
+  test:
     docker:
       - image: circleci/clojure:lein-2.8.1
       - image: zookeeper:3.4.9
@@ -25,24 +25,50 @@ jobs:
       - restore_cache:
           keys:
           - v1-dependencies-{{ .Branch }}-{{ .Revision }}
-
-      - run: 
+      - run:
           name: add lein voom
           command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
-
-      - run: 
+      - run:
           name: lein voom build deps
           command: lein voom build-deps
-
-      - run: 
+      - run:
           name: test
           command: lein test
-
-      - run:
-          name: lein deploy
-          command: lein deploy
-
       - save_cache:
           paths:
             - ~/.m2
           key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
+  release:
+    docker:
+      - image: circleci/clojure:lein-2.8.1
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ .Branch }}-{{ .Revision }}
+      - run:
+          name: add lein voom
+          command: mkdir ~/.lein && echo '{:user {:plugins [[lein-voom "0.1.0-20180617_140646-g0ba7ec8"]]}}' > ~/.lein/profiles.clj
+      - run:
+          name: lein voom build deps
+          command: lein voom build-deps
+      - run:
+          name: lein deploy
+          command: lein deploy
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ .Branch }}-{{ .Revision }}
+
+workflows:
+  version: 2
+  test-build-deploy:
+    jobs:
+      - test
+      - release:
+          requires:
+            - test
+          filters:
+             branches:
+               only: master
