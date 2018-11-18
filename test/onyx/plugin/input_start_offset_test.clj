@@ -43,10 +43,10 @@
 (defn write-data-out
   [topic zookeeper bootstrap-servers]
   (h/create-topic! zookeeper topic 1 1)
-  (let [producer-config {"bootstrap.servers" bootstrap-servers}
-        key-serializer (h/byte-array-serializer)
-        value-serializer (h/byte-array-serializer)]
-    (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
+  (let [producer-config {"bootstrap.servers" bootstrap-servers
+                         "key.serializer" (h/byte-array-serializer-name)
+                         "value.serializer" (h/byte-array-serializer-name)}]
+    (with-open [producer1 (h/build-producer producer-config)]
       (doseq [x (range 5)] ;0 1 2
         (Thread/sleep 500)
         (h/send-sync! producer1 topic nil nil (.getBytes (pr-str {:n x})))))))

@@ -80,7 +80,7 @@
         (testing "routing to default topic"
           (log/info "Waiting on messages in" test-topic)
           (let [msgs (prepare-messages
-                      (h/take-now bootstrap-servers test-topic decompress 15000))]
+                      (h/take-now bootstrap-servers (h/byte-array-deserializer-name) test-topic decompress 15000))]
             (is (= [test-topic] (->> msgs (map :topic) distinct)))
             (is (= [{:key 1 :value {:n 0} :partition 0}
                     {:key nil :value {:n 1} :partition 0}
@@ -90,8 +90,8 @@
           (log/info "Waiting on messages in" other-test-topic)
           (is (= [{:key nil :value {:n 3} :partition 0 :topic other-test-topic}]
                  (prepare-messages
-                  (h/take-now bootstrap-servers other-test-topic decompress)))))
+                  (h/take-now bootstrap-servers (h/byte-array-deserializer-name) other-test-topic decompress)))))
         (testing "overriding the timestamp"
           (log/info "Waiting on messages in" timestamp-test-topic)
           (is (= [{:key nil :value {:n 4} :partition 0 :topic timestamp-test-topic :timestamp test-timestamp}]
-                 (prepare-messages (h/take-now bootstrap-servers timestamp-test-topic decompress) :timestamp)))))))
+                 (prepare-messages (h/take-now bootstrap-servers (h/byte-array-deserializer-name) timestamp-test-topic decompress) :timestamp)))))))

@@ -79,21 +79,27 @@
      {}
      (all-brokers zk-utils))))
 
-(defn byte-array-serializer []
-  (ByteArraySerializer.))
+(defn byte-array-serializer-name []
+  (.getName ^Class ByteArraySerializer))
 
-(defn byte-array-deserializer []
-  (ByteArrayDeserializer.))
+(defn byte-array-deserializer-name []
+  (.getName ^Class ByteArrayDeserializer))
 
-(defn ^KafkaProducer build-producer [producer-opts key-serializer value-serializer]
-  (KafkaProducer. ^Properties (as-properties (as-java producer-opts))
-                  ^Serializer key-serializer
-                  ^Serializer value-serializer))
+(defn ^KafkaProducer build-producer
+  ([producer-opts]
+   (KafkaProducer. ^Properties (as-properties (as-java producer-opts))))
+  ([producer-opts key-serializer value-serializer]
+   (KafkaProducer. ^Properties (as-properties (as-java producer-opts))
+                   ^Serializer key-serializer
+                   ^Serializer value-serializer)))
 
-(defn ^KafkaConsumer build-consumer [consumer-opts key-deserializer value-deserializer]
-  (KafkaConsumer. ^Properties (as-properties (as-java consumer-opts))
-                  ^Deserializer key-deserializer
-                  ^Deserializer value-deserializer))
+(defn ^KafkaConsumer build-consumer
+  ([consumer-opts]
+   (KafkaConsumer. ^Properties (as-properties (as-java consumer-opts))))
+  ([consumer-opts key-deserializer value-deserializer]
+   (KafkaConsumer. ^Properties (as-properties (as-java consumer-opts))
+                   ^Deserializer key-deserializer
+                   ^Deserializer value-deserializer)))
 
 (defn partitions-for-topic [consumer topic]
   (let [parts (.partitionsFor ^KafkaConsumer consumer topic)]
@@ -138,10 +144,14 @@
   "Reads whatever it can from a topic on the assumption that we've distributed
   work across multiple topics and another topic contained :done."
   ([bootstrap-servers topic decompress-fn]
-   (take-now bootstrap-servers topic decompress-fn 5000))
-  ([bootstrap-servers topic decompress-fn timeout]
+   (take-now bootstrap-servers (byte-array-deserializer-name) topic decompress-fn 5000))
+  ([bootstrap-servers key-value-deserializer-name topic decompress-fn]
+   (take-now bootstrap-servers key-value-deserializer-name topic decompress-fn 5000))
+  ([bootstrap-servers key-value-deserializer-name topic decompress-fn timeout]
    (log/info {:msg "Taking now..." :topic topic})
-   (let [c (build-consumer {"bootstrap.servers" bootstrap-servers} (byte-array-deserializer) (byte-array-deserializer))
+   (let [c (build-consumer {"bootstrap.servers" bootstrap-servers
+                            "key.deserializer" key-value-deserializer-name
+                            "value.deserializer" key-value-deserializer-name})
          topic-partitions [{:topic topic :partition 0}]]
      (assign-partitions! c topic-partitions)
      (seek-to-beginning! c topic-partitions)
@@ -168,10 +178,10 @@
   (TopicPartition. topic (.partition part-info)))
 
 (defn end-offsets [bootstrap-servers topic]
-  (let [opts {"bootstrap.servers" bootstrap-servers}
-        k-deser (ByteArrayDeserializer.)
-        v-deser (ByteArrayDeserializer.)]
-    (with-open [consumer (build-consumer opts k-deser v-deser)]
+  (let [opts {"bootstrap.servers" bootstrap-servers
+              "key.deserializer" (byte-array-deserializer-name)
+              "value.deserializer" (byte-array-deserializer-name)}]
+    (with-open [consumer (build-consumer opts)]
       (let [parts (.partitionsFor consumer topic)
             tps (map (partial partition-info->topic-partition topic) parts)]
         (.endOffsets consumer tps)))))
@@ -184,10 +194,10 @@
    (into {} end-offsets)))
 
 (defn beginning-end-offsets-clj [bootstrap-servers topic]
-  (let [opts {"bootstrap.servers" bootstrap-servers}
-        k-deser (ByteArrayDeserializer.)
-        v-deser (ByteArrayDeserializer.)]
-    (with-open [consumer (build-consumer opts k-deser v-deser)]
+  (let [opts {"bootstrap.servers" bootstrap-servers
+              "key.deserializer" (byte-array-deserializer-name)
+              "value.deserializer" (byte-array-deserializer-name)}]
+    (with-open [consumer (build-consumer opts)]
       (let [parts (.partitionsFor consumer topic)
             tps (map (partial partition-info->topic-partition topic) parts)]
         {:beginning-offsets (offsets->clj (.beginningOffsets consumer tps))

@@ -42,11 +42,11 @@
   "Use a custom version of mock-kafka as opposed to the one in test-utils
   because we need to spawn 2 producers in order to write to each partition"
   [topic zookeeper bootstrap-servers]
-  (let [producer-config {"bootstrap.servers" bootstrap-servers}
-        key-serializer (h/byte-array-serializer)
-        value-serializer (h/byte-array-serializer)]
-    (with-open [producer1 (h/build-producer producer-config key-serializer value-serializer)]
-      (with-open [producer2 (h/build-producer producer-config key-serializer value-serializer)]
+  (let [producer-config {"bootstrap.servers" bootstrap-servers
+                         "key.serializer" (h/byte-array-serializer-name)
+                         "value.serializer" (h/byte-array-serializer-name)}]
+    (with-open [producer1 (h/build-producer producer-config)]
+      (with-open [producer2 (h/build-producer producer-config)]
         (doseq [x (range 3)] ;0 1 2
           (h/send-sync! producer1 topic nil nil (.getBytes (pr-str {:n x}))))
         (doseq [x (range 3)] ;3 4 5
