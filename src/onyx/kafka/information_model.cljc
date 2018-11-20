@@ -79,9 +79,19 @@
               :default 2000
               :optional? true}
 
+             :kafka/deserializer
+             {:doc "Set the 'value.deserializer' property of KafkaConsumer."
+              :default "org.apache.kafka.common.serialization.ByteArrayDeserializer"
+              :type :string}
+
              :kafka/deserializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's value. Takes one argument, which must be a byte array."
               :type :keyword}
+
+             :kafka/key-deserializer
+             {:doc "Set the 'key.deserializer' property of KafkaConsumer."
+              :default "org.apache.kafka.common.serialization.ByteArrayDeserializer"
+              :type :string}
 
              :kafka/key-deserializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's key. Takes one argument, which must be a byte array. Only used when `:kafka/wrap-with-metadata?` is true."
@@ -131,9 +141,19 @@
               :type :long
               :optional? true}
 
+             :kafka/serializer
+             {:doc "Set the 'value.serializer' property of KafkaProducer."
+              :default "org.apache.kafka.common.serialization.ByteArraySerializer"
+              :type :string}
+
              :kafka/serializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a record's value. Takes one argument - the segment."
               :type :keyword}
+
+             :kafka/key-serializer
+             {:doc "Set the 'key.serializer' property of KafkaProducer."
+              :default "org.apache.kafka.common.serialization.ByteArraySerializer"
+              :type :string}
 
              :kafka/key-serializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a record's key. Takes one argument - the segment."
@@ -171,7 +191,9 @@
      :kafka/bootstrap-servers
      :kafka/offset-reset
      :kafka/force-reset?
+     :kafka/deserializer
      :kafka/deserializer-fn
+     :kafka/key-deserializer
      :kafka/key-deserializer-fn
      :kafka/receive-buffer-bytes
      :kafka/commit-interval
@@ -188,7 +210,9 @@
      :kafka/zookeeper
      :kafka/bootstrap-servers
      :kafka/partition
+     :kafka/serializer
      :kafka/serializer-fn
+     :kafka/key-serializer
      :kafka/key-serializer-fn
      :kafka/request-size
      :kafka/no-seal?

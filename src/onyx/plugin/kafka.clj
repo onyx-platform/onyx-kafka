@@ -20,9 +20,9 @@
    :kafka/wrap-with-metadata? false
    :kafka/unable-to-find-broker-backoff-ms 8000
    :kafka/key-deserializer (h/byte-array-deserializer-name)
-   :kafka/value-deserializer (h/byte-array-deserializer-name)
+   :kafka/deserializer (h/byte-array-deserializer-name)
    :kafka/key-serializer (h/byte-array-serializer-name)
-   :kafka/value-serializer (h/byte-array-serializer-name)})
+   :kafka/serializer (h/byte-array-serializer-name)})
 
 (defn seek-offset! [log-prefix consumer kpartitions task-map topic checkpoint]
   (let [policy (:kafka/offset-reset task-map)
@@ -181,8 +181,10 @@
                                   "receive.buffer.bytes" (or (:kafka/receive-buffer-bytes task-map)
                                                              (:kafka/receive-buffer-bytes defaults))
                                   "auto.offset.reset" (name (:kafka/offset-reset task-map))
-                                  "key.deserializer" (:kafka/key-deserializer defaults)
-                                  "value.deserializer" (:kafka/value-deserializer defaults)}
+                                  "key.deserializer" (or (:kafka/key-deserializer task-map)
+                                                       (:kafka/key-deserializer defaults))
+                                  "value.deserializer" (or (:kafka/deserializer task-map)
+                                                         (:kafka/deserializer defaults))}
                                  consumer-opts)
           _ (info log-prefix "Starting kafka/read-messages task with consumer opts:" consumer-config)
           consumer* (h/build-consumer consumer-config)
@@ -399,8 +401,10 @@
         producer-opts (:kafka/producer-opts task-map)
         config (merge {"bootstrap.servers" brokers
                        "max.request.size" request-size
-                       "key.serializer" (:kafka/key-serializer defaults)
-                       "value.serializer" (:kafka/value-serializer defaults)}
+                       "key.serializer" (or (:kafka/key-serializer task-map)
+                                            (:kafka/key-serializer defaults))
+                       "value.serializer" (or (:kafka/serializer task-map)
+                                              (:kafka/serializer defaults))}
                       producer-opts)
         _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
         topic (:kafka/topic task-map)
