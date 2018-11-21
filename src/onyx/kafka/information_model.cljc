@@ -82,7 +82,8 @@
              :kafka/deserializer
              {:doc "Set the 'value.deserializer' property of KafkaConsumer."
               :default "org.apache.kafka.common.serialization.ByteArrayDeserializer"
-              :type :string}
+              :type :string
+              :optional? true}
 
              :kafka/deserializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's value. Takes one argument, which must be a byte array."
@@ -91,7 +92,8 @@
              :kafka/key-deserializer
              {:doc "Set the 'key.deserializer' property of KafkaConsumer."
               :default "org.apache.kafka.common.serialization.ByteArrayDeserializer"
-              :type :string}
+              :type :string
+              :optional? true}
 
              :kafka/key-deserializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to deserialize a record's key. Takes one argument, which must be a byte array. Only used when `:kafka/wrap-with-metadata?` is true."
@@ -144,7 +146,8 @@
              :kafka/serializer
              {:doc "Set the 'value.serializer' property of KafkaProducer."
               :default "org.apache.kafka.common.serialization.ByteArraySerializer"
-              :type :string}
+              :type :string
+              :optional? true}
 
              :kafka/serializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a record's value. Takes one argument - the segment."
@@ -153,7 +156,8 @@
              :kafka/key-serializer
              {:doc "Set the 'key.serializer' property of KafkaProducer."
               :default "org.apache.kafka.common.serialization.ByteArraySerializer"
-              :type :string}
+              :type :string
+              :optional? true}
 
              :kafka/key-serializer-fn
              {:doc "A keyword that represents a fully qualified namespaced function to serialize a record's key. Takes one argument - the segment."
