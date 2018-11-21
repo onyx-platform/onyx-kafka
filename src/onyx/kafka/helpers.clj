@@ -144,14 +144,16 @@
   "Reads whatever it can from a topic on the assumption that we've distributed
   work across multiple topics and another topic contained :done."
   ([bootstrap-servers topic decompress-fn]
-   (take-now bootstrap-servers (byte-array-deserializer-name) topic decompress-fn 5000))
-  ([bootstrap-servers key-value-deserializer-name topic decompress-fn]
-   (take-now bootstrap-servers key-value-deserializer-name topic decompress-fn 5000))
-  ([bootstrap-servers key-value-deserializer-name topic decompress-fn timeout]
+   (take-now bootstrap-servers topic decompress-fn 5000 (byte-array-deserializer-name) (byte-array-deserializer-name)))
+  ([bootstrap-servers topic decompress-fn timeout]
+   (take-now bootstrap-servers topic decompress-fn timeout (byte-array-deserializer-name) (byte-array-deserializer-name)))
+  ([bootstrap-servers topic decompress-fn key-deserializer-name value-deserializer-name]
+   (take-now bootstrap-servers topic decompress-fn 5000 key-deserializer-name value-deserializer-name))
+  ([bootstrap-servers topic decompress-fn timeout key-deserializer-name value-deserializer-name]
    (log/info {:msg "Taking now..." :topic topic})
    (let [c (build-consumer {"bootstrap.servers" bootstrap-servers
-                            "key.deserializer" key-value-deserializer-name
-                            "value.deserializer" key-value-deserializer-name})
+                            "key.deserializer" key-deserializer-name
+                            "value.deserializer" value-deserializer-name})
          topic-partitions [{:topic topic :partition 0}]]
      (assign-partitions! c topic-partitions)
      (seek-to-beginning! c topic-partitions)
@@ -177,14 +179,17 @@
 (defn partition-info->topic-partition [topic ^PartitionInfo part-info]
   (TopicPartition. topic (.partition part-info)))
 
-(defn end-offsets [bootstrap-servers topic]
-  (let [opts {"bootstrap.servers" bootstrap-servers
-              "key.deserializer" (byte-array-deserializer-name)
-              "value.deserializer" (byte-array-deserializer-name)}]
-    (with-open [consumer (build-consumer opts)]
-      (let [parts (.partitionsFor consumer topic)
-            tps (map (partial partition-info->topic-partition topic) parts)]
-        (.endOffsets consumer tps)))))
+(defn end-offsets
+  ([bootstrap-servers topic]
+   (end-offsets bootstrap-servers topic (byte-array-deserializer-name) (byte-array-deserializer-name)))
+  ([bootstrap-servers topic key-deserializer-name value-deserializer-name]
+   (let [opts {"bootstrap.servers" bootstrap-servers
+               "key.deserializer" key-deserializer-name
+               "value.deserializer" value-deserializer-name}]
+     (with-open [consumer (build-consumer opts)]
+       (let [parts (.partitionsFor consumer topic)
+             tps (map (partial partition-info->topic-partition topic) parts)]
+         (.endOffsets consumer tps))))))
 
 (defn offsets->clj [end-offsets]
   (reduce-kv
@@ -193,12 +198,15 @@
    {}
    (into {} end-offsets)))
 
-(defn beginning-end-offsets-clj [bootstrap-servers topic]
-  (let [opts {"bootstrap.servers" bootstrap-servers
-              "key.deserializer" (byte-array-deserializer-name)
-              "value.deserializer" (byte-array-deserializer-name)}]
-    (with-open [consumer (build-consumer opts)]
-      (let [parts (.partitionsFor consumer topic)
-            tps (map (partial partition-info->topic-partition topic) parts)]
-        {:beginning-offsets (offsets->clj (.beginningOffsets consumer tps))
-         :end-offsets (offsets->clj (.endOffsets consumer tps))}))))
+(defn beginning-end-offsets-clj
+  ([bootstrap-servers topic]
+   (beginning-end-offsets-clj bootstrap-servers topic (byte-array-deserializer-name) (byte-array-deserializer-name)))
+  ([bootstrap-servers topic key-deserializer-name value-deserializer-name]
+   (let [opts {"bootstrap.servers" bootstrap-servers
+               "key.deserializer" key-deserializer-name 
+               "value.deserializer" value-deserializer-name}]
+     (with-open [consumer (build-consumer opts)]
+       (let [parts (.partitionsFor consumer topic)
+             tps (map (partial partition-info->topic-partition topic) parts)]
+         {:beginning-offsets (offsets->clj (.beginningOffsets consumer tps))
+          :end-offsets (offsets->clj (.endOffsets consumer tps))})))))
