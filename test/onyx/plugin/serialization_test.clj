@@ -27,15 +27,23 @@
 (def batch-settings {:onyx/batch-size    batch-size
                      :onyx/batch-timeout batch-timeout})
 
+(defn key-serializer [key]
+  (is (instance? Long key))
+  key)
+
+(defn value-serializer [value]
+  (is (instance? String value))
+  value)
+
 (defn custom-serializers-producer-task [zk-address topic]
   (producer :write-messages
             (merge {:kafka/topic topic
                     :kafka/zookeeper zk-address
 
                     :kafka/serializer value-serializer-name
-                    :kafka/serializer-fn :clojure.core/identity
+                    :kafka/serializer-fn ::value-serializer
                     :kafka/key-serializer key-serializer-name
-                    :kafka/key-serializer-fn :clojure.core/identity
+                    :kafka/key-serializer-fn ::key-serializer
 
                     :kafka/request-size 307200}
                    batch-settings)))
@@ -65,9 +73,9 @@
                                    :kafka/wrap-with-metadata? wrap-with-metadata
 
                                    :kafka/deserializer value-deserializer-name
-                                   :kafka/deserializer-fn :clojure.core/identity
+                                   :kafka/deserializer-fn ::value-serializer
                                    :kafka/key-deserializer key-deserializer-name
-                                   :kafka/key-deserializer-fn :clojure.core/identity
+                                   :kafka/key-deserializer-fn ::key-serializer
 
                                    :onyx/min-peers 1
                                    :onyx/max-peers 1}
