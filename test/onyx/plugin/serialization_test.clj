@@ -12,7 +12,8 @@
             [onyx.plugin.kafka]
             [onyx.api]
             [taoensso.timbre :as log])
-  (:import [org.apache.kafka.common.serialization LongSerializer LongDeserializer StringSerializer StringDeserializer]))
+  (:import [org.apache.kafka.common.serialization LongSerializer LongDeserializer StringSerializer StringDeserializer]
+           [org.apache.kafka.clients.consumer ConsumerRecords]))
 
 (def key-serializer-name (.getName ^Class LongSerializer))
 (def key-deserializer-name (.getName ^Class LongDeserializer))
@@ -89,7 +90,7 @@
         (add-task (custom-deserializers-consumer-task zk-address topic))
         (add-task (core-async/output :out batch-settings)))))
 
-(defn check-vanilla-kafka-consumer-is-happy-with [topic]
+(defn check-vanilla-kafka-consumer-is-happy-with [topic bootstrap-servers]
   (let [my-consumer 
         (h/build-consumer {"bootstrap.servers" bootstrap-servers
                            "group.id" (str "vanilla-java" (java.util.UUID/randomUUID))
@@ -142,7 +143,7 @@
         (println "... done"))
 
       (testing "vanilla KafkaConsumer is happy"
-        (check-vanilla-kafka-consumer-is-happy-with test-topic))
+        (check-vanilla-kafka-consumer-is-happy-with test-topic bootstrap-servers))
 
       (testing "reading with custom serializers" 
          (let [job-id (:job-id (onyx.api/submit-job peer-config read-job))]
