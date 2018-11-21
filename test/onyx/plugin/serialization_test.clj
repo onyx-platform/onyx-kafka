@@ -56,11 +56,13 @@
         (add-task (core-async/input :in batch-settings))
         (add-task (custom-serializers-producer-task zk-address topic)))))
 
-(defn custom-deserializers-consumer-task [zk-address topic]
+(defn custom-deserializers-consumer-task [zk-address topic wrap-with-metadata]
   (consumer :read-messages (merge {:kafka/topic topic
                                    :kafka/group-id "onyx-consumer"
                                    :kafka/zookeeper zk-address
                                    :kafka/offset-reset :earliest
+
+                                   :kafka/wrap-with-metadata? wrap-with-metadata
 
                                    :kafka/deserializer value-deserializer-name
                                    :kafka/deserializer-fn :clojure.core/identity
@@ -74,7 +76,7 @@
 (defn assert-read-messages [message]
   message)
 
-(defn build-read-messages-job [zk-address topic]
+(defn build-read-messages-job [zk-address topic wrap-with-metadata]
   (let [base-job (merge {:workflow [[:read-messages :assert-read-messages]
                                     [:assert-read-messages :out]]
                          :catalog [(merge {:onyx/name :assert-read-messages
@@ -87,7 +89,7 @@
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
-        (add-task (custom-deserializers-consumer-task zk-address topic))
+        (add-task (custom-deserializers-consumer-task zk-address topic wrap-with-metadata))
         (add-task (core-async/output :out batch-settings)))))
 
 (defn check-vanilla-kafka-consumer-is-happy-with [topic bootstrap-servers]
@@ -121,16 +123,13 @@
         peer-config (assoc peer-config :onyx/tenancy-id tenancy-id)
         zk-address (get-in peer-config [:zookeeper/address])
         write-job (build-write-messages-job zk-address test-topic)
-        read-job (build-read-messages-job zk-address test-topic)
         bootstrap-servers (:kafka-bootstrap test-config)
         {:keys [in]} (get-core-async-channels write-job)
-        {:keys [out read-messages]} (get-core-async-channels read-job)
         test-data [{:key 1 :message "Message 1"}
                    {:key 2 :message "Message 2"}
                    {:key 3 :message "Message 3"}]]
     (with-test-env [test-env [4 env-config peer-config]]
       (onyx.test-helper/validate-enough-peers! test-env write-job)
-      (onyx.test-helper/validate-enough-peers! test-env read-job)
       (h/create-topic! zk-address test-topic 1 1)
       (run! #(>!! in %) test-data)
       (close! in)
@@ -145,10 +144,28 @@
       (testing "vanilla KafkaConsumer is happy"
         (check-vanilla-kafka-consumer-is-happy-with test-topic bootstrap-servers))
 
-      (testing "reading with custom serializers" 
-         (let [job-id (:job-id (onyx.api/submit-job peer-config read-job))]
-           (let [results (onyx.plugin.core-async/take-segments! out 10000)] 
-             (println "Result" results)
-             (is (= ["Message 1" "Message 2" "Message 3"] results)))
-           (println "Done taking segments")
-           (onyx.api/kill-job peer-config job-id))))))
+      (testing "reading with custom serializers"
+        (let [read-job      (build-read-messages-job zk-address test-topic false)
+              _             (onyx.test-helper/validate-enough-peers! test-env read-job)
+              job-id        (:job-id (onyx.api/submit-job peer-config read-job))
+              {:keys [out]} (get-core-async-channels read-job)
+              results       (onyx.plugin.core-async/take-segments! out 10000)]
+          (println "Result" results)
+          (is (= ["Message 1" "Message 2" "Message 3"] results))
+          (println "Done taking segments")
+          (onyx.api/kill-job peer-config job-id)))
+
+      (testing "reading with custom serializers and {:wrap-with-metadata? true}"
+        (let [read-job      (build-read-messages-job zk-address test-topic true)
+              _             (onyx.test-helper/validate-enough-peers! test-env read-job)
+              job-id        (:job-id (onyx.api/submit-job peer-config read-job))
+              {:keys [out]} (get-core-async-channels read-job)
+              results       (onyx.plugin.core-async/take-segments! out 10000)]
+          (println "Result" results)
+          (let [first-message (first results)
+                {:keys [:key :message :topic]} first-message]
+            (is (= 1 key))
+            (is (= "Message 1" message))
+            (is (= test-topic topic)))
+          (println "Done taking segments")
+          (onyx.api/kill-job peer-config job-id))))))
