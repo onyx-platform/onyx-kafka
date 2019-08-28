@@ -77,7 +77,7 @@
          (log/info "Waiting on messages in" test-topic)
          (let [run-time (- (System/currentTimeMillis) start-time)
                _ (println (float (* 1000 (/ n-messages-total run-time))) "messages per second. Processed" n-messages-total "messages in" run-time "ms.")
-               ;msgs (take-now zk-address test-topic decompress 180000)
+               ;msgs (h/take-now zk-address test-topic decompress 180000 (h/byte-array-deserializer-name) (h/byte-array-deserializer-name))
                ]
            ;(is (= (map :n test-data) (map :value msgs)))
            )))

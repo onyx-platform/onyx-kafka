@@ -18,7 +18,11 @@
 (def defaults
   {:kafka/receive-buffer-bytes 65536
    :kafka/wrap-with-metadata? false
-   :kafka/unable-to-find-broker-backoff-ms 8000})
+   :kafka/unable-to-find-broker-backoff-ms 8000
+   :kafka/key-deserializer (h/byte-array-deserializer-name)
+   :kafka/deserializer (h/byte-array-deserializer-name)
+   :kafka/key-serializer (h/byte-array-serializer-name)
+   :kafka/serializer (h/byte-array-serializer-name)})
 
 (defn seek-offset! [log-prefix consumer kpartitions task-map topic checkpoint]
   (let [policy (:kafka/offset-reset task-map)
@@ -176,12 +180,14 @@
                                   "enable.auto.commit" false
                                   "receive.buffer.bytes" (or (:kafka/receive-buffer-bytes task-map)
                                                              (:kafka/receive-buffer-bytes defaults))
-                                  "auto.offset.reset" (name (:kafka/offset-reset task-map))}
+                                  "auto.offset.reset" (name (:kafka/offset-reset task-map))
+                                  "key.deserializer" (or (:kafka/key-deserializer task-map)
+                                                       (:kafka/key-deserializer defaults))
+                                  "value.deserializer" (or (:kafka/deserializer task-map)
+                                                         (:kafka/deserializer defaults))}
                                  consumer-opts)
           _ (info log-prefix "Starting kafka/read-messages task with consumer opts:" consumer-config)
-          key-deserializer (h/byte-array-deserializer)
-          value-deserializer (h/byte-array-deserializer)
-          consumer* (h/build-consumer consumer-config key-deserializer value-deserializer)
+          consumer* (h/build-consumer consumer-config)
           _ (when (and (:kafka/target-offsets task-map)
                        (:kafka/start-offsets task-map)
                        (not= (set (keys (:kafka/target-offsets task-map)))
@@ -394,14 +400,16 @@
         request-size (or (get task-map :kafka/request-size) (get write-defaults :kafka/request-size))
         producer-opts (:kafka/producer-opts task-map)
         config (merge {"bootstrap.servers" brokers
-                       "max.request.size" request-size}
+                       "max.request.size" request-size
+                       "key.serializer" (or (:kafka/key-serializer task-map)
+                                            (:kafka/key-serializer defaults))
+                       "value.serializer" (or (:kafka/serializer task-map)
+                                              (:kafka/serializer defaults))}
                       producer-opts)
         _ (info log-prefix "Starting kafka/write-messages task with producer opts:" config)
         topic (:kafka/topic task-map)
         kpartition (:kafka/partition task-map)
-        key-serializer (h/byte-array-serializer)
-        value-serializer (h/byte-array-serializer)
-        producer (h/build-producer config key-serializer value-serializer)
+        producer (h/build-producer config)
         serializer-fn (kw->fn (:kafka/serializer-fn task-map))
         key-serializer-fn (if-let [kw (:kafka/key-serializer-fn task-map)] (kw->fn kw) identity)
         exception (atom nil)

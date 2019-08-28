@@ -20,10 +20,10 @@
   "Starts a Kafka in-memory instance, preloading a topic with xs.
    If xs is a channel, will load the topic with items off the channel."
   ([topic zookeeper bootstrap-servers xs]
-   (let [config {"bootstrap.servers" bootstrap-servers}
-         key-serializer (h/byte-array-serializer)
-         value-serializer (h/byte-array-serializer)
-         prod (h/build-producer config key-serializer value-serializer)]
+   (let [config {"bootstrap.servers" bootstrap-servers
+                 "key.serializer" (h/byte-array-serializer-name)
+                 "value.serializer" (h/byte-array-serializer-name)}
+         prod (h/build-producer config)]
      (if (sequential? xs)
        (do
          (doseq [x xs]

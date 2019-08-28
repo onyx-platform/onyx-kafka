@@ -74,10 +74,10 @@
 (defn write-data
   [topic zookeeper bootstrap-servers]
   (h/create-topic! zookeeper topic n-partitions 1)
-  (let [producer-config {"bootstrap.servers" bootstrap-servers}
-        key-serializer (h/byte-array-serializer)
-        value-serializer (h/byte-array-serializer)
-        producer1 (h/build-producer producer-config key-serializer value-serializer)]
+  (let [producer-config {"bootstrap.servers" bootstrap-servers
+                         "key.serializer" (h/byte-array-serializer-name)
+                         "value.serializer" (h/byte-array-serializer-name)}
+        producer1 (h/build-producer producer-config)]
     (time 
      (doseq [p (range n-partitions)]
        (mapv deref 
